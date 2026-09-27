@@ -1,0 +1,24 @@
+/* Preview chrome only; never loaded by the extension. */
+html { background: #dfe5ef; }
+body { background: #dfe5ef; height: auto; min-height: 100vh; }
+.preview-bar { display: flex; align-items: center; justify-content: space-between; gap: 24px; max-width: 1060px; margin: 0 auto; padding: 24px; color: #283a57; }
+.preview-title { font-size: 14px; font-weight: 650; }
+.preview-title small { display: block; font-size: 11px; font-weight: 400; color: #536580; }
+.preview-nav { display: flex; flex-wrap: wrap; gap: 8px; }
+.preview-nav a { color: #364d70; font-size: 12px; text-decoration: none; padding: 8px 12px; border: 1px solid #bdc9db; border-radius: 8px; }
+.preview-nav a[aria-current] { background: #263f67; color: #fff; border-color: #263f67; }
+#panel-host { width: 400px; max-width: 100%; margin: 0 auto 28px; border: 1px solid #bac7db; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 60px #233b601c; position: relative; transform: translateZ(0); }
+#panel-host .md-app { height: min(860px, calc(100dvh - 116px)); min-height: 450px; }
+.preview-loading { padding: 24px; }
+@media (max-width: 520px) {
+  .preview-bar { display: none; }
+  #panel-host { width: 100%; margin: 0; border: 0; border-radius: 0; }
+  #panel-host .md-app { height: 100dvh; min-height: 0; }
+}
+@media (prefers-color-scheme: dark) {
+  html, body { background: #0d1420; }
+  .preview-bar { color: #e0e9fb; }
+  .preview-title small { color: #aabbd7; }
+  .preview-nav a { color: #c0d0e8; border-color: #35445b; }
+  #panel-host { border-color: #35445b; }
+}

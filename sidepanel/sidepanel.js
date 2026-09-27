@@ -347,8 +347,11 @@
   const shortcutDialog = document.getElementById('shortcut-help');
   const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  let shortcutReturnFocus = null;
   function openShortcuts() {
     if (!shortcutDialog) return;
+    shortcutReturnFocus = document.activeElement;
+    document.getElementById('app').inert = true;
     shortcutHelpVisible = true;
     shortcutDialog.classList.remove('md-dialog--closing');
     shortcutDialog.style.display = 'block';
@@ -363,12 +366,20 @@
     setTimeout(() => {
       shortcutDialog.style.display = 'none';
       shortcutDialog.classList.remove('md-dialog--closing');
-      if (dom.btnSettings) dom.btnSettings.focus();
+      document.getElementById('app').inert = false;
+      if (shortcutReturnFocus?.isConnected) shortcutReturnFocus.focus();
     }, REDUCED_MOTION ? 0 : 200);
   }
 
   function initKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
+      // Escape must work even while a switch or range has focus.
+      if (e.key === 'Escape') {
+        if (shortcutHelpVisible) closeShortcuts();
+        else if (dom.settingsPanel?.style.display !== 'none') closeSettingsSheet();
+        return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey || e.target.isContentEditable) return;
       // Don't intercept if user is in an input/select field
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
 
@@ -532,7 +543,7 @@
     renderMoveClassificationEmpty();
     initScrollElevation();
     initVersionStamp();
-    updateEngineStatus('connecting', 'Connecting to cloud...');
+    updateEngineStatus('connecting', 'Looking for a board…');
     updateCorrelationStat();   // initialise "0 / 0 (0%)" display
     runHealthCheck();          // passive status only; does not call providers
   }
@@ -559,7 +570,7 @@
     const el = document.getElementById('app-version-stamp');
     if (!el) return;
     const manifest = chrome.runtime && chrome.runtime.getManifest ? chrome.runtime.getManifest() : null;
-    el.textContent = manifest ? `Felt · v${manifest.version}` : '';
+    el.textContent = manifest ? `Chessor · v${manifest.version}` : '';
   }
 
   // Focus trap for the settings panel so Tab can't escape
@@ -570,7 +581,7 @@
     const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
     const getFocusable = () => Array.from(dom.settingsPanel.querySelectorAll(FOCUSABLE))
-      .filter(el => el.offsetParent !== null && !el.disabled);
+      .filter(el => el.offsetParent !== null && !el.disabled && el.tabIndex >= 0);
 
     dom.settingsPanel.addEventListener('keydown', (e) => {
       if (e.key !== 'Tab') return;
@@ -747,57 +758,26 @@
       btn.classList.toggle('active', selected);
       btn.setAttribute('aria-checked', selected ? 'true' : 'false');
     });
-    // The pill picks up the piece identity (light for White, dark for Black)
+    // Preserve the selected side as a semantic state hook.
     dom.playerSelector.dataset.selected = assistedPlayerColor || 'w';
     layoutSegmented(dom.playerSelector);
   }
 
-  // ─── Segmented controls: sliding selection pill ────────────────────
-  // One shared pill per radiogroup springs to the checked option. Measuring
-  // happens in JS so the motion stays GPU-friendly (transform + width only).
-  const segmentedGroups = [];
-
+  // Native-feeling radio groups: one tab stop, arrows select within the group.
+  // No indicator measurements or ResizeObservers; selection is pure CSS.
   function layoutSegmented(group) {
     if (!group) return;
-    const indicator = group.querySelector('.md-segmented__indicator');
-    const selected = group.querySelector('[aria-checked="true"]');
-    if (!indicator || !selected) return;
-    // Groups inside the hidden settings sheet measure as zero — stay
-    // transparent and re-measure when the sheet opens.
-    if (group.offsetWidth === 0 || selected.offsetWidth === 0) {
-      group.classList.remove('is-ready');
-      return;
-    }
-    group.style.setProperty('--seg-x', `${selected.offsetLeft}px`);
-    group.style.setProperty('--seg-y', `${selected.offsetTop}px`);
-    group.style.setProperty('--seg-w', `${selected.offsetWidth}px`);
-    group.style.setProperty('--seg-h', `${selected.offsetHeight}px`);
-    group.classList.add('is-ready');
+    const items = Array.from(group.querySelectorAll('[role="radio"]')).filter(el => !el.disabled);
+    const selected = items.find(el => el.getAttribute('aria-checked') === 'true') || items[0];
+    items.forEach(el => { el.tabIndex = el === selected ? 0 : -1; });
   }
 
   function syncAllSegments() {
-    segmentedGroups.forEach(layoutSegmented);
+    $$('[role="radiogroup"]').forEach(layoutSegmented);
   }
 
   function initSegmentedControls() {
-    $$('.md-btn-group[role="radiogroup"]').forEach((group) => {
-      if (!group.querySelector('.md-segmented__indicator')) {
-        const indicator = document.createElement('span');
-        indicator.className = 'md-segmented__indicator';
-        indicator.setAttribute('aria-hidden', 'true');
-        group.prepend(indicator);
-      }
-      segmentedGroups.push(group);
-      // Re-measure when the panel itself resizes (text wraps change targets)
-      if (typeof ResizeObserver === 'function') {
-        new ResizeObserver(() => layoutSegmented(group)).observe(group);
-      }
-    });
-    // Fonts shift metrics — re-layout once they settle.
-    if (document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(() => syncAllSegments()).catch(() => {});
-    }
-    requestAnimationFrame(syncAllSegments);
+    syncAllSegments();
   }
 
   // ─── Event Binding ─────────────────────────────────────────────────
@@ -862,7 +842,7 @@
       });
     }
 
-    // Theme toggle removed — dark only
+    // Theme follows the browser/OS color-scheme preference.
 
     // Settings and CSP-safe shortcut-help close button + scrim dismissal
     const closeShortcutHelp = document.getElementById('btn-close-shortcut-help');
@@ -967,33 +947,20 @@
       });
     });
 
-    // APG radiogroup pattern: arrow keys rove between options and select.
-    $$('.md-btn-group[role="radiogroup"]').forEach((group) => {
+    // Shared APG keyboard behavior includes the White/Black selector.
+    $$('[role="radiogroup"]').forEach((group) => {
       group.addEventListener('keydown', (e) => {
-        if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
-        const items = Array.from(group.querySelectorAll('[role="radio"]'));
+        if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+        const items = Array.from(group.querySelectorAll('[role="radio"]')).filter(el => !el.disabled);
         const index = items.indexOf(document.activeElement);
-        if (index === -1) return;
+        if (index === -1 || !items.length) return;
         e.preventDefault();
         const dir = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1 : -1;
-        const next = items[(index + dir + items.length) % items.length];
-        next.focus();
-        next.click();
-      });
-    });
-
-    // The style choice stack is a radiogroup too — same roving behavior.
-    $$('.md-choice-stack[role="radiogroup"]').forEach((group) => {
-      group.addEventListener('keydown', (e) => {
-        if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
-        const items = Array.from(group.querySelectorAll('[role="radio"]'));
-        const index = items.indexOf(document.activeElement);
-        if (index === -1) return;
-        e.preventDefault();
-        const dir = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1 : -1;
-        const next = items[(index + dir + items.length) % items.length];
-        next.focus();
-        next.click();
+        const target = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1
+          : (index + dir + items.length) % items.length;
+        items[target].focus();
+        items[target].click();
+        layoutSegmented(group);
       });
     });
   }
@@ -1095,7 +1062,7 @@
     dom.positionContext.classList.toggle('partial', !positionReliable && turnReliable);
     dom.positionContext.classList.toggle('pending', !turnReliable);
     dom.positionTurn.textContent = !turnReliable
-      ? 'Waiting for a game'
+      ? 'Waiting for a board'
       : (isPlayerTurn ? 'Your turn' : 'Opponent turn');
   }
 
@@ -1580,13 +1547,19 @@
 
   let settingsSheetCloseTimer = null;
 
+  function setWorkspaceInert(value) {
+    document.querySelectorAll('.md-app-bar, .md-status, .md-canvas, .md-toolbar, .skip-link')
+      .forEach(element => { element.inert = value; });
+  }
+
   function openSettingsSheet() {
     if (!dom.settingsPanel) return;
     if (settingsSheetCloseTimer) clearTimeout(settingsSheetCloseTimer);
     dom.settingsPanel.classList.remove('md-sheet--closing');
     dom.settingsPanel.style.display = 'flex';
-    // The sheet was hidden, so its segmented groups measured as zero.
-    requestAnimationFrame(() => requestAnimationFrame(syncAllSegments));
+    setWorkspaceInert(true);
+    // Synchronize roving tab stops after settings become visible.
+    syncAllSegments();
     runHealthCheck();
   }
 
@@ -1599,6 +1572,8 @@
       panel.style.display = 'none';
       panel.classList.remove('md-sheet--closing');
       settingsSheetCloseTimer = null;
+      setWorkspaceInert(false);
+      dom.btnSettings?.focus();
     }, REDUCED_MOTION ? 0 : 210);
   }
 
@@ -1935,9 +1910,19 @@
 
     if (dom.hintText) {
       if (hints.bestMoveFromTo) {
-        // The lockup (big piece + squares) is the hero content — the SAN label
-        // would be redundant beside it, so it stays silent.
-        dom.hintText.textContent = '';
+        // Keep SAN and mate context readable; the coordinate row helps beginners.
+        dom.hintText.replaceChildren();
+        const mate = /^(.*?) — MATE IN (\d+)$/.exec(hints.main);
+        const notation = document.createElement('span');
+        notation.className = 'hint-san';
+        notation.textContent = mate ? mate[1] : hints.main;
+        dom.hintText.append(notation);
+        if (mate) {
+          const context = document.createElement('span');
+          context.className = 'hint-mate';
+          context.textContent = `Mate in ${mate[2]}`;
+          dom.hintText.append(context);
+        }
         dom.hintText.classList.remove('fade-in');
       } else {
         dom.hintText.textContent = hints.main;
