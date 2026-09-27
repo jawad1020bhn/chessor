@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chess Coach</title>
+  <title>Chessor — Study desk</title>
   <link rel="stylesheet" href="sidepanel.css">
 </head>
 <body>
+  <a class="skip-link" href="#main-canvas">Skip to analysis</a>
   <div id="toast-container" class="md-snackbar-host" role="alert" aria-live="polite" aria-atomic="true"></div>
 
   <div id="shortcut-help" class="md-dialog" style="display:none" role="dialog" aria-labelledby="shortcut-help-title" aria-modal="true">
@@ -36,15 +37,14 @@
           <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M19 22H5v-2h14v2Zm-2-5H7l-1 3h12l-1-3Zm-1 0c0-2.5 1.5-4 1.5-6.5C17.5 7.5 15 5 12 5c-1 0-2 .3-2.8.8C10.5 6.5 11 8 10.5 9.5 10 11 8.5 11.5 7 11.5 7 14 8.5 15.5 9.5 17H16Z"/></svg>
         </div>
         <div class="md-app-bar__titles">
-          <p class="md-typescale-label-md md-app-bar__eyebrow">Study coach</p>
-          <h1 class="md-typescale-title-large-em">Felt</h1>
+          <p class="md-typescale-label-md md-app-bar__eyebrow">Your study desk</p>
+          <h1 class="md-typescale-title-large-em">Chessor</h1>
         </div>
       </div>
       <div class="md-app-bar__actions">
         <div id="player-selector" class="md-side-switch" role="radiogroup" aria-label="Which side to coach" data-selected="w">
-          <span class="md-side-switch__thumb" aria-hidden="true"><svg class="md-side-switch__king" viewBox="0 0 298 298"><path fill="currentColor" d="M197.333,256h-1.641c1.878-3.337,7.061-14.536-0.605-25.6c-7.554-10.905-21.491-39.547-20.904-64.401c4.409-0.01,7.816-3.587,7.816-7.999v-1c0-4.418-3.582-8-8-8c4.418,0,8-3.582,8-8v-1c0-4.418-3.249-8-7.667-8h-3.55c-1.006-16.142,1.307-29.861,4.798-40.724c1.121-3.487,2.432-6.186,3.752-8.276h2c4.418,0,7.667-3.582,7.667-8v-1c0-4.343-3.463-7.87-7.777-7.988C179.087,52.771,169,42.203,156,39.363V27h12V12h-12V0h-15v12h-12v15h12v12.595c-12,3.15-21.803,13.512-23.888,26.405h-0.779c-4.418,0-8.333,3.582-8.333,8v1c0,4.418,3.915,8,8.333,8h3c1.32,2.091,2.631,4.789,3.752,8.276c3.491,10.862,5.804,24.582,4.798,40.724h-4.55c-4.418,0-8.333,3.582-8.333,8v1c0,4.418,3.582,8,8,8c-4.418,0-8,3.582-8,8v1c0,4.418,3.915,8,8.333,8h1.053c0.588,24.855-13.183,53.495-20.737,64.4c-7.664,11.063-2.482,22.263-0.604,25.6h-1.711c-4.418,0-8.333,3.582-8.333,8v9c0,3.727,3,6.849,6,7.737V298h100v-17.263c4-0.889,6-4.011,6-7.737v-9C205,259.582,201.751,256,197.333,256z"/></svg></span>
-          <button type="button" class="player-btn md-side-switch__hit" data-color="w" role="radio" aria-checked="true" aria-label="Coach White"></button>
-          <button type="button" class="player-btn md-side-switch__hit" data-color="b" role="radio" aria-checked="false" aria-label="Coach Black"></button>
+          <button type="button" class="player-btn md-side-switch__hit" data-color="w" role="radio" aria-checked="true" aria-label="Coach White" title="Coach White"><span aria-hidden="true">♔</span></button>
+          <button type="button" class="player-btn md-side-switch__hit" data-color="b" role="radio" aria-checked="false" aria-label="Coach Black" title="Coach Black"><span aria-hidden="true">♚</span></button>
         </div>
         <button id="btn-settings" class="md-icon-btn md-icon-btn--tonal" type="button" title="Settings (S)" aria-label="Open settings">
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.2 7.2 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.59.22-1.14.53-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.48a.5.5 0 0 0 .12.64L4.86 10.7c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.23.4.32.64.22l2.39-.96c.5.41 1.04.72 1.63.94l.36 2.54c.05.24.25.42.49.42h3.8c.24 0 .44-.18.49-.42l.36-2.54c.59-.22 1.14-.53 1.63-.94l2.39.96c.24.1.51 0 .64-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/></svg>
@@ -59,21 +59,22 @@
       <span class="status-dot connecting" aria-hidden="true"></span>
       <span class="status-text">Connecting…</span>
       <div id="position-context" class="md-status__meta pending" aria-label="Turn status">
-        <span id="position-turn" class="md-typescale-label-md context-turn">Waiting for a game</span>
+        <span id="position-turn" class="md-typescale-label-md context-turn">Waiting for a board</span>
       </div>
     </div>
 
-    <main class="md-canvas" id="main-canvas">
+    <main class="md-canvas" id="main-canvas" tabindex="0">
       <section id="hint-section" class="md-hero" aria-label="Recommended move">
         <div class="md-hero__meta">
-          <span class="md-typescale-label-md md-hero__kicker">Your move</span>
+          <span class="md-typescale-label-md md-hero__kicker">Recommended move</span>
+          <span class="study-badge">Study mode</span>
         </div>
         <div id="hint-card" class="hint-card md-hero__stage exact-move" aria-live="polite">
           <div id="hero-welcome" class="md-welcome" aria-hidden="false">
             <span class="md-welcome__blob" aria-hidden="true"></span>
             <svg class="md-welcome__knight" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path fill="currentColor" d="M19 22H5v-2h14v2Zm-2-5H7l-1 3h12l-1-3Zm-1 0c0-2.5 1.5-4 1.5-6.5C17.5 7.5 15 5 12 5c-1 0-2 .3-2.8.8C10.5 6.5 11 8 10.5 9.5 10 11 8.5 11.5 7 11.5 7 14 8.5 15.5 9.5 17H16Z"/></svg>
-            <p class="md-welcome__title">Open a game</p>
-            <p class="md-welcome__sub">Your coach wakes up the moment a board appears.</p>
+            <p class="md-welcome__title">A clearer view of your next move.</p>
+            <p class="md-welcome__sub">Open a supported analysis board to explore a position. For study and review, not live competitive play.</p>
           </div>
           <p id="hint-text" class="hint-text">Waiting for a board…</p>
           <div id="hint-fromto" class="hint-fromto" style="display:none" aria-label="Move squares"></div>
@@ -100,7 +101,7 @@
         <span class="md-balance__orb md-balance__orb--b" aria-hidden="true"></span>
         <div class="md-balance__head">
           <div class="md-balance__kicker-row">
-            <p class="md-typescale-label-md md-balance__kicker">Balance</p>
+            <p class="md-typescale-label-md md-balance__kicker">Position balance</p>
             <span id="eval-stale-badge" class="md-balance__stale" style="display:none">cached</span>
           </div>
           <p id="eval-description" class="eval-description md-typescale-body-md">Waiting for analysis…</p>
@@ -145,7 +146,7 @@
       </section>
 
       <section id="position-info" class="md-card md-facts" aria-label="Position facts">
-        <h2 class="md-typescale-title-sm">Position</h2>
+        <h2 class="md-typescale-title-sm">Position details</h2>
         <dl class="md-fact-list">
           <div class="info-row md-fact"><dt class="info-label">Opening</dt><dd id="opening-name" class="info-value">–</dd></div>
           <div class="info-row md-fact"><dt class="info-label">Phase</dt><dd id="game-phase" class="info-value">–</dd></div>
@@ -158,9 +159,10 @@
     </main>
 
     <footer class="md-toolbar" role="contentinfo">
-      <div class="md-toolbar__label md-typescale-label-md">Exact move · study only</div>
+      <div class="md-toolbar__label md-typescale-label-md">Analysis for study only</div>
       <button id="btn-refresh" class="md-fab" type="button" title="Refresh analysis (R)" aria-label="Refresh analysis">
         <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.45 5.1h-2.21A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35Z"/></svg>
+        <span>Analyze again</span>
       </button>
     </footer>
 
@@ -168,7 +170,7 @@
       <header class="md-sheet__bar">
         <div>
           <p class="md-typescale-label-md md-sheet__eyebrow">Saved automatically</p>
-          <h2 id="settings-title" class="md-typescale-headline-sm">Tune the coach</h2>
+          <h2 id="settings-title" class="md-typescale-headline-sm">Your preferences</h2>
         </div>
         <button id="btn-close-settings" class="md-icon-btn" type="button" aria-label="Close settings">
           <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
@@ -177,7 +179,7 @@
 
       <div class="md-sheet__body settings-body">
         <section class="md-settings-block" aria-labelledby="set-show">
-          <h3 id="set-show" class="md-typescale-title-sm">What to show</h3>
+          <h3 id="set-show" class="md-typescale-title-sm">Coaching preferences</h3>
           <div class="md-switch-row">
             <div>
               <p class="md-switch-row__title">Analyze on my turn</p>
@@ -222,7 +224,7 @@
             <div class="md-engine__body">
               <p class="md-help">Stockfish 18 · live depth ~12–18.</p>
               <label class="visually-hidden" for="setting-analysis-quality">Analysis quality</label>
-              <select id="setting-analysis-quality" class="visually-hidden">
+              <select id="setting-analysis-quality" class="visually-hidden" tabindex="-1" aria-hidden="true">
                 <option value="auto" selected>Auto</option>
                 <option value="fast">Fast</option>
                 <option value="balanced">Balanced</option>
@@ -230,7 +232,6 @@
               </select>
               <p class="md-field-label">Quality</p>
               <div class="md-segmented md-btn-group md-btn-group--wrap" role="radiogroup" aria-label="Analysis quality">
-                <span class="md-segmented__indicator" aria-hidden="true"></span>
                 <button type="button" class="md-btn-group__item" data-expressive-setting="setting-analysis-quality" data-value="auto" role="radio">Auto</button>
                 <button type="button" class="md-btn-group__item" data-expressive-setting="setting-analysis-quality" data-value="fast" role="radio">Fast</button>
                 <button type="button" class="md-btn-group__item" data-expressive-setting="setting-analysis-quality" data-value="balanced" role="radio">Balanced</button>
@@ -251,14 +252,13 @@
             <div class="md-engine__body">
               <p class="md-help">Cached depth 40–75+ · instant when the position is warm.</p>
               <label class="visually-hidden" for="setting-candidate-lines">Candidate lines</label>
-              <select id="setting-candidate-lines" class="visually-hidden">
+              <select id="setting-candidate-lines" class="visually-hidden" tabindex="-1" aria-hidden="true">
                 <option value="auto" selected>Auto</option>
                 <option value="3">3</option>
                 <option value="5">5</option>
               </select>
               <p class="md-field-label">Candidate lines</p>
               <div class="md-segmented md-btn-group" role="radiogroup" aria-label="Candidate lines">
-                <span class="md-segmented__indicator" aria-hidden="true"></span>
                 <button type="button" class="md-btn-group__item" data-expressive-setting="setting-candidate-lines" data-value="auto" role="radio">Auto</button>
                 <button type="button" class="md-btn-group__item" data-expressive-setting="setting-candidate-lines" data-value="3" role="radio">3</button>
                 <button type="button" class="md-btn-group__item" data-expressive-setting="setting-candidate-lines" data-value="5" role="radio">5</button>
@@ -274,7 +274,7 @@
             </div>
             <div class="md-engine__body">
               <label class="visually-hidden" for="setting-style">Style</label>
-              <select id="setting-style" class="visually-hidden">
+              <select id="setting-style" class="visually-hidden" tabindex="-1" aria-hidden="true">
                 <option value="normal" selected>Normal</option>
                 <option value="aggressive">Aggressive</option>
                 <option value="super_ultra_aggressive">Ultra Super Aggressive</option>
@@ -312,9 +312,8 @@
                   <p class="human-mode-sub md-help">Prefer natural plans over engine-echo moves.</p>
                   <span class="human-mode-status visually-hidden">Off</span>
                 </div>
-                <input type="checkbox" id="setting-human-like-mode" class="human-mode-checkbox visually-hidden">
+                <input type="checkbox" id="setting-human-like-mode" class="human-mode-checkbox visually-hidden" tabindex="-1" aria-hidden="true" aria-label="Human-like moves">
                 <div class="md-segmented md-btn-group md-btn-group--connected human-mode-segmented" role="radiogroup" aria-label="Move voice">
-                  <span class="md-segmented__indicator" aria-hidden="true"></span>
                   <button type="button" class="human-mode-opt md-btn-group__item is-selected" data-mode="off" role="radio" aria-checked="true">Engine</button>
                   <button type="button" class="human-mode-opt md-btn-group__item" data-mode="on" role="radio" aria-checked="false">Human</button>
                 </div>
@@ -356,7 +355,7 @@
               <p class="md-help">Use only Maia 3 as the hint source, with its own settings below.</p>
             </div>
             <label class="md-switch">
-              <input type="checkbox" id="setting-maia-only" checked="false">
+              <input type="checkbox" id="setting-maia-only">
               <span class="md-switch__track" aria-hidden="true"><span class="md-switch__thumb"></span></span>
               <span class="visually-hidden">Use only Maia 3 as the hint source</span>
             </label>
@@ -381,13 +380,12 @@
             </div>
             <p class="md-field-label">Maia lines</p>
             <div class="md-segmented md-btn-group" role="radiogroup" aria-label="Maia candidate lines">
-              <span class="md-segmented__indicator" aria-hidden="true"></span>
               <button type="button" class="md-btn-group__item" data-expressive-setting="setting-maia-lines" data-value="auto" role="radio">Auto</button>
               <button type="button" class="md-btn-group__item" data-expressive-setting="setting-maia-lines" data-value="3" role="radio">3</button>
               <button type="button" class="md-btn-group__item" data-expressive-setting="setting-maia-lines" data-value="5" role="radio">5</button>
             </div>
             <label class="visually-hidden" for="setting-maia-lines">Maia candidate lines</label>
-            <select id="setting-maia-lines" class="visually-hidden">
+            <select id="setting-maia-lines" class="visually-hidden" tabindex="-1" aria-hidden="true">
               <option value="auto" selected>Auto</option>
               <option value="3">3</option>
               <option value="5">5</option>
@@ -413,7 +411,7 @@
         </section>
 
         <section class="md-settings-block" aria-labelledby="set-health">
-          <h3 id="set-health" class="md-typescale-title-sm">Provider pulse</h3>
+          <h3 id="set-health" class="md-typescale-title-sm">Provider status</h3>
           <div id="api-health-status" class="md-health">
             <div class="md-health__row"><span>Chess-API.com</span><span id="health-chessapi" class="api-status unknown">No recent data</span></div>
             <div class="md-health__row"><span>Lichess Cloud</span><span id="health-lichess" class="api-status unknown">No recent data</span></div>

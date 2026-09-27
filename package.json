@@ -1,0 +1,15 @@
+{
+  "name": "chessor",
+  "version": "13.0.0",
+  "private": true,
+  "description": "Chess study extension; development tools only, no runtime dependencies.",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "test:ui": "playwright test",
+    "preview": "python3 preview/serve.py"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.11.1",
+    "@playwright/test": "1.63.0"
+  }
+}
