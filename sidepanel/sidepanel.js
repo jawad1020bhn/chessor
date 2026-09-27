@@ -120,17 +120,17 @@
       'maia3': 'setting-use-maia3',
       'masters-explorer': 'setting-use-masters-explorer'
     };
-    $$('.md-engine[data-engine]').forEach(group => {
+    $$('.g-engine[data-engine]').forEach(group => {
       if (group.dataset.engine === 'engine-style') {
         const chessApi = $(`#setting-use-chess-api`);
         const lichess = $(`#setting-use-lichess-cloud`);
         const bothOff = (chessApi ? chessApi.checked !== true : false)
           && (lichess ? lichess.checked !== true : false);
-        group.classList.toggle('md-engine--off', bothOff);
+        group.classList.toggle('g-engine--off', bothOff);
         return;
       }
       const toggle = $(`#${toggles[group.dataset.engine]}`);
-      group.classList.toggle('md-engine--off', toggle ? toggle.checked !== true : false);
+      group.classList.toggle('g-engine--off', toggle ? toggle.checked !== true : false);
     });
   }
 
@@ -141,8 +141,8 @@
       block.hidden = !maiaOnly;
       block.setAttribute('aria-hidden', maiaOnly ? 'false' : 'true');
     }
-    $$('.md-engine[data-engine]').forEach(group => {
-      if (group.dataset.engine !== 'maia3') group.classList.toggle('md-engine--inactive', maiaOnly);
+    $$('.g-engine[data-engine]').forEach(group => {
+      if (group.dataset.engine !== 'maia3') group.classList.toggle('g-engine--inactive', maiaOnly);
     });
     const gated = ['setting-style', 'setting-human-like-mode', 'setting-sparring-strength',
       'setting-analysis-quality', 'setting-candidate-lines',
@@ -151,7 +151,7 @@
       const el = $(`#${id}`);
       if (el) el.disabled = maiaOnly;
     }
-    $$('.md-choice-stack .md-choice').forEach(btn => {
+    $$('.g-choices .g-choice').forEach(btn => {
       if (maiaOnly) btn.setAttribute('aria-disabled', 'true');
       else btn.removeAttribute('aria-disabled');
     });
@@ -350,7 +350,7 @@
   function openShortcuts() {
     if (!shortcutDialog) return;
     shortcutHelpVisible = true;
-    shortcutDialog.classList.remove('md-dialog--closing');
+    shortcutDialog.classList.remove('g-dialog--closing');
     shortcutDialog.style.display = 'block';
     const closeBtn = document.getElementById('btn-close-shortcut-help');
     if (closeBtn) closeBtn.focus();
@@ -359,10 +359,10 @@
   function closeShortcuts() {
     if (!shortcutDialog || shortcutDialog.style.display === 'none') return;
     shortcutHelpVisible = false;
-    shortcutDialog.classList.add('md-dialog--closing');
+    shortcutDialog.classList.add('g-dialog--closing');
     setTimeout(() => {
       shortcutDialog.style.display = 'none';
-      shortcutDialog.classList.remove('md-dialog--closing');
+      shortcutDialog.classList.remove('g-dialog--closing');
       if (dom.btnSettings) dom.btnSettings.focus();
     }, REDUCED_MOTION ? 0 : 200);
   }
@@ -381,7 +381,7 @@
           break;
         case 's':
           e.preventDefault();
-          if (dom.settingsPanel && dom.settingsPanel.classList.contains('md-sheet--closing')) {
+          if (dom.settingsPanel && dom.settingsPanel.classList.contains('g-sheet--closing')) {
             openSettingsSheet();   // cancel the closing motion, come straight back
           } else if (dom.settingsPanel && dom.settingsPanel.style.display !== 'none') {
             closeSettingsSheet();
@@ -474,13 +474,13 @@
   // Skeleton shimmer reads the tile's role color via currentColor.
   function renderBalanceSkeleton() {
     if (dom.evalDescription) {
-      dom.evalDescription.innerHTML = '<span class="md-skeleton" style="width:58%">&#8203;</span>';
+      dom.evalDescription.innerHTML = '<span class="g-skeleton" style="width:58%">&#8203;</span>';
     }
     if (dom.evalWhiteLabel) {
-      dom.evalWhiteLabel.innerHTML = '<span class="md-skeleton" style="width:3.5ch">&#8203;</span>';
+      dom.evalWhiteLabel.innerHTML = '<span class="g-skeleton" style="width:3.5ch">&#8203;</span>';
     }
     if (dom.evalBlackLabel) {
-      dom.evalBlackLabel.innerHTML = '<span class="md-skeleton" style="width:3.5ch">&#8203;</span>';
+      dom.evalBlackLabel.innerHTML = '<span class="g-skeleton" style="width:3.5ch">&#8203;</span>';
     }
   }
 
@@ -541,7 +541,7 @@
   // One rAF-throttled scroll listener flips `.is-scrolled` on the app shell;
   // the CSS carries the whole visual response.
   function initScrollElevation() {
-    const canvas = document.querySelector('.md-canvas');
+    const canvas = document.querySelector('.g-canvas');
     const app = document.getElementById('app');
     if (!canvas || !app) return;
     let ticking = false;
@@ -559,7 +559,7 @@
     const el = document.getElementById('app-version-stamp');
     if (!el) return;
     const manifest = chrome.runtime && chrome.runtime.getManifest ? chrome.runtime.getManifest() : null;
-    el.textContent = manifest ? `Felt · v${manifest.version}` : '';
+    el.textContent = manifest ? `Gambit · v${manifest.version}` : '';
   }
 
   // Focus trap for the settings panel so Tab can't escape
@@ -643,8 +643,8 @@
   function initMdSliders() {
     $$('[data-md-slider]').forEach((slider) => {
       const input = slider.querySelector('input[type="range"]');
-      const fill = slider.querySelector('.md-slider__fill');
-      const handle = slider.querySelector('.md-slider__handle');
+      const fill = slider.querySelector('.g-slider__fill');
+      const handle = slider.querySelector('.g-slider__handle');
       if (!input || !fill || !handle) return;
 
       const render = () => {
@@ -759,7 +759,7 @@
 
   function layoutSegmented(group) {
     if (!group) return;
-    const indicator = group.querySelector('.md-segmented__indicator');
+    const indicator = group.querySelector('.g-seg__indicator');
     const selected = group.querySelector('[aria-checked="true"]');
     if (!indicator || !selected) return;
     // Groups inside the hidden settings sheet measure as zero — stay
@@ -780,10 +780,10 @@
   }
 
   function initSegmentedControls() {
-    $$('.md-btn-group[role="radiogroup"]').forEach((group) => {
-      if (!group.querySelector('.md-segmented__indicator')) {
+    $$('.g-seg-group[role="radiogroup"]').forEach((group) => {
+      if (!group.querySelector('.g-seg__indicator')) {
         const indicator = document.createElement('span');
-        indicator.className = 'md-segmented__indicator';
+        indicator.className = 'g-seg__indicator';
         indicator.setAttribute('aria-hidden', 'true');
         group.prepend(indicator);
       }
@@ -968,7 +968,7 @@
     });
 
     // APG radiogroup pattern: arrow keys rove between options and select.
-    $$('.md-btn-group[role="radiogroup"]').forEach((group) => {
+    $$('.g-seg-group[role="radiogroup"]').forEach((group) => {
       group.addEventListener('keydown', (e) => {
         if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
         const items = Array.from(group.querySelectorAll('[role="radio"]'));
@@ -983,7 +983,7 @@
     });
 
     // The style choice stack is a radiogroup too — same roving behavior.
-    $$('.md-choice-stack[role="radiogroup"]').forEach((group) => {
+    $$('.g-choices[role="radiogroup"]').forEach((group) => {
       group.addEventListener('keydown', (e) => {
         if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp'].includes(e.key)) return;
         const items = Array.from(group.querySelectorAll('[role="radio"]'));
@@ -1583,7 +1583,7 @@
   function openSettingsSheet() {
     if (!dom.settingsPanel) return;
     if (settingsSheetCloseTimer) clearTimeout(settingsSheetCloseTimer);
-    dom.settingsPanel.classList.remove('md-sheet--closing');
+    dom.settingsPanel.classList.remove('g-sheet--closing');
     dom.settingsPanel.style.display = 'flex';
     // The sheet was hidden, so its segmented groups measured as zero.
     requestAnimationFrame(() => requestAnimationFrame(syncAllSegments));
@@ -1593,11 +1593,11 @@
   function closeSettingsSheet() {
     if (!dom.settingsPanel) return;
     const panel = dom.settingsPanel;
-    if (panel.style.display === 'none' || panel.classList.contains('md-sheet--closing')) return;
-    panel.classList.add('md-sheet--closing');
+    if (panel.style.display === 'none' || panel.classList.contains('g-sheet--closing')) return;
+    panel.classList.add('g-sheet--closing');
     settingsSheetCloseTimer = setTimeout(() => {
       panel.style.display = 'none';
-      panel.classList.remove('md-sheet--closing');
+      panel.classList.remove('g-sheet--closing');
       settingsSheetCloseTimer = null;
     }, REDUCED_MOTION ? 0 : 210);
   }
@@ -1693,22 +1693,22 @@
     items.forEach((caption, index) => {
       const kind = IDEA_KINDS.has(caption.kind) ? caption.kind : 'posture';
       const row = document.createElement('div');
-      row.className = `md-idea__row md-idea__row--${kind}`;
+      row.className = `g-cap g-cap--${kind}`;
       row.setAttribute('role', 'listitem');
       row.style.setProperty('--i', String(index));
       const icon = document.createElement('span');
-      icon.className = 'md-idea__icon';
+      icon.className = 'g-cap__icon';
       icon.setAttribute('aria-hidden', 'true');
       const texts = document.createElement('div');
-      texts.className = 'md-idea__texts';
+      texts.className = 'g-cap__texts';
       if (caption.label) {
         const label = document.createElement('span');
-        label.className = 'md-idea__label';
+        label.className = 'g-cap__label';
         label.textContent = caption.label;
         texts.appendChild(label);
       }
       const body = document.createElement('span');
-      body.className = 'md-idea__body';
+      body.className = 'g-cap__body';
       body.textContent = caption.text;
       texts.appendChild(body);
       row.append(icon, texts);
@@ -1774,7 +1774,7 @@
       rows.push({
         san,
         piece: PIECE_GLYPHS[effectiveColor === 'w' ? 'White' : 'Black'][sanPieceName(san)] || '',
-        sideClass: effectiveColor === 'w' ? 'md-alt-row--white' : 'md-alt-row--black',
+        sideClass: effectiveColor === 'w' ? 'g-alt--white' : 'g-alt--black',
         scoreStr,
         isMate: pv.scoreType === 'mate',
         share,
@@ -1789,19 +1789,19 @@
     }
     rows.forEach((row, index) => {
       const el = document.createElement('div');
-      el.className = `md-alt-row ${row.sideClass}`;
+      el.className = `g-alt ${row.sideClass}`;
       el.setAttribute('role', 'listitem');
       el.style.setProperty('--i', String(index));
       el.style.setProperty('--share', String(row.share));
       const piece = document.createElement('span');
-      piece.className = 'md-alt-row__piece';
+      piece.className = 'g-alt__piece';
       piece.setAttribute('aria-hidden', 'true');
       piece.textContent = row.piece;
       const san = document.createElement('span');
-      san.className = 'md-alt-row__san';
+      san.className = 'g-alt__san';
       san.textContent = row.san;
       const meter = document.createElement('span');
-      meter.className = 'md-alt-row__meter';
+      meter.className = 'g-alt__meter';
       meter.setAttribute('role', 'progressbar');
       meter.setAttribute('aria-label', `Keeps about ${row.share}% of the best line's value`);
       meter.setAttribute('aria-valuemin', '0');
@@ -1809,15 +1809,15 @@
       meter.setAttribute('aria-valuenow', String(row.share));
       meter.title = `Keeps about ${row.share}% of the best line's value`;
       const fill = document.createElement('span');
-      fill.className = 'md-alt-row__meter-fill';
+      fill.className = 'g-alt__meter-fill';
       meter.appendChild(fill);
       const score = document.createElement('span');
-      score.className = 'md-alt-row__score' + (row.isMate ? ' is-mate' : '');
+      score.className = 'g-alt__score' + (row.isMate ? ' is-mate' : '');
       score.textContent = row.scoreStr;
       el.append(piece, san, meter, score);
       if (row.isAttack) {
         const tag = document.createElement('span');
-        tag.className = 'md-alt-row__tag';
+        tag.className = 'g-alt__tag';
         tag.textContent = 'Attack';
         tag.setAttribute('aria-label', row.attackTitle ? `Aggressive attack: ${row.attackTitle}` : 'Aggressive attack');
         if (row.attackTitle) tag.title = row.attackTitle;
@@ -1987,9 +1987,9 @@
     dom.moveClassSection.dataset.verdict = 'none';
     dom.moveClassSection.dataset.state = 'empty';
     dom.moveClassDisplay.innerHTML = `
-      <div class="md-verdict__empty">
-        <span class="md-verdict__empty-icon" aria-hidden="true"></span>
-        <p class="md-verdict__empty-text">Play a move to see how it rated</p>
+      <div class="g-verdict__empty">
+        <span class="g-verdict__empty-icon" aria-hidden="true"></span>
+        <p class="g-verdict__empty-text">Play a move to see how it rated</p>
       </div>
     `;
   }
@@ -2020,18 +2020,18 @@
     dom.moveClassSection.dataset.verdict = cls.label.toLowerCase();
     dom.moveClassSection.dataset.state = 'data';
     const symbol = cls.symbol
-      ? ` <span class="md-verdict__symbol" aria-hidden="true">${h(cls.symbol)}</span>`
+      ? ` <span class="g-verdict__symbol" aria-hidden="true">${h(cls.symbol)}</span>`
       : '';
     dom.moveClassDisplay.innerHTML = `
-      <div class="md-verdict__copy">
-        <p class="md-verdict__mover">${h(moverText)}</p>
-        <p class="md-verdict__label">${h(cls.label)}${symbol}</p>
-        <p class="md-verdict__metric">${h(swing)}</p>
+      <div class="g-verdict__copy">
+        <p class="g-verdict__mover">${h(moverText)}</p>
+        <p class="g-verdict__label">${h(cls.label)}${symbol}</p>
+        <p class="g-verdict__metric">${h(swing)}</p>
       </div>
-      <div class="md-verdict__ring" style="--acc: ${acc}" role="img" title="Engine accuracy estimate for this move (${acc}/100)" aria-label="Engine accuracy estimate ${acc} of 100">
-        <span class="md-verdict__ring-stack">
-          <span class="md-verdict__ring-val">${h(acc)}</span>
-          <span class="md-verdict__ring-cap">/ 100</span>
+      <div class="g-verdict__ring" style="--acc: ${acc}" role="img" title="Engine accuracy estimate for this move (${acc}/100)" aria-label="Engine accuracy estimate ${acc} of 100">
+        <span class="g-verdict__ring-stack">
+          <span class="g-verdict__ring-val">${h(acc)}</span>
+          <span class="g-verdict__ring-cap">/ 100</span>
         </span>
       </div>
     `;
@@ -2039,7 +2039,7 @@
       dom.moveClassSection.classList.remove('pop');
       void dom.moveClassSection.offsetHeight;
       dom.moveClassSection.classList.add('pop');
-      const ringVal = dom.moveClassDisplay.querySelector('.md-verdict__ring-val');
+      const ringVal = dom.moveClassDisplay.querySelector('.g-verdict__ring-val');
       if (ringVal) animateCountUp(ringVal, acc, 520);
     }
   }
