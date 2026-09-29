@@ -1,425 +1,80 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-scheme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Chess Coach</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=Instrument+Sans:ital,wght@0,400..700;1,400..600&family=JetBrains+Mono:ital,wght@0,300..800;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="sidepanel.css">
 </head>
 <body>
-  <div id="toast-container" class="snackbar-host" role="alert" aria-live="polite" aria-atomic="true"></div>
-
-  <!-- Shortcuts Dialog -->
-  <div id="shortcut-help" class="dialog" hidden role="dialog" aria-labelledby="shortcut-help-title" aria-modal="true">
-    <div class="dialog__scrim" data-close-shortcuts></div>
-    <div class="dialog__sheet">
-      <div class="dialog__handle" aria-hidden="true"></div>
-      <header class="dialog__bar">
-        <h2 id="shortcut-help-title" class="dialog__title">Shortcuts</h2>
-        <button id="btn-close-shortcut-help" class="icon-btn" type="button" aria-label="Close shortcuts">
-          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-        </button>
-      </header>
-      <div class="dialog__body shortcut-list">
-        <div class="shortcut"><span>Refresh analysis</span><kbd>R</kbd></div>
-        <div class="shortcut"><span>Open settings</span><kbd>S</kbd></div>
-        <div class="shortcut"><span>Close</span><kbd>Esc</kbd></div>
-        <div class="shortcut"><span>Show shortcuts</span><kbd>?</kbd></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Settings Sheet -->
-  <div id="settings-sheet" class="sheet" role="dialog" aria-labelledby="settings-title" aria-modal="true" hidden>
-    <header class="sheet__bar">
-      <div>
-        <p class="sheet__eyebrow">Saved automatically</p>
-        <h2 id="settings-title" class="sheet__title">Tune the coach</h2>
-      </div>
-      <button id="btn-close-settings" class="icon-btn" type="button" aria-label="Close settings">
-        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
-      </button>
-    </header>
-
-    <div class="sheet__body">
-      <!-- What to show -->
-      <section class="settings-block" aria-labelledby="set-show">
-        <h3 id="set-show" class="settings-block__title">What to show</h3>
-
-        <div class="switch-row">
-          <div>
-            <p class="switch-row__title">Analyze on my turn</p>
-            <p class="help-text">No requests while the opponent is thinking.</p>
-          </div>
-          <label class="switch">
-            <input type="checkbox" id="setting-auto-analyze" checked>
-            <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
-            <span class="visually-hidden">Auto-analyze on your turn</span>
-          </label>
-        </div>
-
-        <div class="switch-row">
-          <div><p class="switch-row__title">Threat alerts</p></div>
-          <label class="switch">
-            <input type="checkbox" id="setting-show-threats" checked>
-            <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
-            <span class="visually-hidden">Threat alerts</span>
-          </label>
-        </div>
-
-        <div class="switch-row">
-          <div><p class="switch-row__title">Critical moments</p></div>
-          <label class="switch">
-            <input type="checkbox" id="setting-show-critical-moments" checked>
-            <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
-            <span class="visually-hidden">Critical moment alerts</span>
-          </label>
-        </div>
-      </section>
-
-      <!-- Analysis sources -->
-      <section class="settings-block" aria-labelledby="set-sources">
-        <h3 id="set-sources" class="settings-block__title">Analysis sources</h3>
-        <p class="help-text">Each engine runs with its own settings. Turn one off to hide its options.</p>
-
-        <!-- Chess-API -->
-        <div class="engine-group" data-engine="chess-api" role="group" aria-label="Chess-API engine settings">
-          <div class="switch-row">
-            <div><p class="switch-row__title">Chess-API.com</p></div>
-            <label class="switch">
-              <input type="checkbox" id="setting-use-chess-api" checked>
-              <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
-              <span class="visually-hidden">Use Chess-API.com</span>
-            </label>
-          </div>
-          <div class="engine-group__body">
-            <p class="help-text">Stockfish 18 · live depth ~12–18.</p>
-            <p class="field-label">Quality</p>
-            <div class="segmented" role="radiogroup" aria-label="Analysis quality">
-              <button type="button" class="segmented__item" data-expressive-setting="setting-analysis-quality" data-value="auto" role="radio" aria-checked="true">Auto</button>
-              <button type="button" class="segmented__item" data-expressive-setting="setting-analysis-quality" data-value="fast" role="radio" aria-checked="false">Fast</button>
-              <button type="button" class="segmented__item" data-expressive-setting="setting-analysis-quality" data-value="balanced" role="radio" aria-checked="false">Balanced</button>
-              <button type="button" class="segmented__item" data-expressive-setting="setting-analysis-quality" data-value="deep" role="radio" aria-checked="false">Deep</button>
-            </div>
-            <p class="help-text">Sets engine depth and local fallback effort.</p>
-          </div>
-        </div>
-
-        <!-- Lichess Cloud -->
-        <div class="engine-group" data-engine="lichess-cloud" role="group" aria-label="Lichess Cloud engine settings">
-          <div class="switch-row">
-            <div><p class="switch-row__title">Lichess Cloud</p></div>
-            <label class="switch">
-              <input type="checkbox" id="setting-use-lichess-cloud" checked>
-              <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
-              <span class="visually-hidden">Use Lichess Cloud Evaluation</span>
-            </label>
-          </div>
-          <div class="engine-group__body">
-            <p class="help-text">Cached depth 40–75+ · instant when the position is warm.</p>
-            <p class="field-label">Candidate lines</p>
-            <div class="segmented" role="radiogroup" aria-label="Candidate lines">
-              <button type="button" class="segmented__item" data-expressive-setting="setting-candidate-lines" data-value="auto" role="radio" aria-checked="true">Auto</button>
-              <button type="button" class="segmented__item" data-expressive-setting="setting-candidate-lines" data-value="3" role="radio" aria-checked="false">3</button>
-              <button type="button" class="segmented__item" data-expressive-setting="setting-candidate-lines" data-value="5" role="radio" aria-checked="false">5</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Engine Style -->
-        <div class="engine-group" data-engine="engine-style" role="group" aria-label="Engine style settings">
-          <div class="switch-row">
-            <div>
-              <p class="switch-row__title">Engine style</p>
-              <p class="help-text">Chess-API · Lichess Cloud only. Maia and Masters ignore it.</p>
-            </div>
-          </div>
-          <div class="engine-group__body">
-            <div class="choice-stack" role="radiogroup" aria-label="Playing style">
-              <button type="button" class="choice" data-expressive-setting="setting-style" data-value="normal" role="radio" aria-checked="true">
-                <span class="choice__title">Normal</span>
-                <span class="choice__sub">Objective best play</span>
-              </button>
-              <button type="button" class="choice" data-expressive-setting="setting-style" data-value="aggressive" role="radio" aria-checked="false">
-                <span class="choice__title">Aggressive</span>
-                <span class="choice__sub">Fastest sound win</span>
-              </button>
-              <button type="button" class="choice" data-expressive-setting="setting-style" data-value="super_ultra_aggressive" role="radio" aria-checked="false">
-                <span class="choice__title">Ultra attack</span>
-                <span class="choice__sub">Maximum pressure vs ≤1100</span>
-              </button>
-            </div>
-            <p id="style-description" class="help-text">Objective best play, reliable conversion, and solid defense.</p>
-
-            <!-- Early King Hunt (style-gated) -->
-            <div id="early-king-hunt-setting" class="switch-row early-king-hunt-setting" hidden>
-              <div>
-                <p class="switch-row__title">Early King Hunt</p>
-                <p class="help-text">Force an early direct attack while Ultra attack is on.</p>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="setting-early-king-hunt" disabled>
-                <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
-                <span class="visually-hidden">Early King Hunt</span>
-              </label>
-            </div>
-
-            <!-- Play human -->
-            <div class="switch-row">
-              <div>
-                <p class="switch-row__title">Play human</p>
-                <p class="human-mode-sub help-text">Prefer natural plans over engine-echo moves.</p>
-                <span class="human-mode-status visually-hidden">Off</span>
-              </div>
-              <input type="checkbox" id="setting-human-like-mode" class="human-mode-checkbox visually-hidden">
-              <div class="segmented segmented--connected human-mode-segmented" role="radiogroup" aria-label="Move voice">
-                <button type="button" class="segmented__item human-mode-opt" data-mode="off" data-expressive-setting="setting-human-like-mode" data-value="off" role="radio" aria-checked="true">Engine</button>
-                <button type="button" class="segmented__item human-mode-opt" data-mode="on" data-expressive-setting="setting-human-like-mode" data-value="on" role="radio" aria-checked="false">Human</button>
-              </div>
-            </div>
-
-            <!-- Sparring strength (human mode only) -->
-            <div id="sparring-strength-row" class="slider-row" hidden>
-              <div class="slider-row__header">
-                <label class="switch-row__title" for="setting-sparring-strength">Sparring strength</label>
-                <output id="sparring-strength-value" class="slider-row__value" for="setting-sparring-strength">1100</output>
-              </div>
-              <div class="slider" data-md-slider>
-                <input type="range" id="setting-sparring-strength" min="600" max="1600" step="50" value="1100" aria-label="Sparring strength rating">
-                <span class="slider__track" aria-hidden="true"></span>
-                <span class="slider__fill" aria-hidden="true"></span>
-                <span class="slider__handle" aria-hidden="true"><span class="slider__handle-dot"></span></span>
-              </div>
-              <div class="slider__scale" aria-hidden="true">
-                <span>600</span><span>800</span><span>1000</span><span>1200</span><span>1400</span><span>1600</span>
-              </div>
-              <p class="help-text">How strong the sparring partner plays in human mode.</p>
-            </div>
-
-            <p id="human-thinking-note" class="help-text" hidden>Managed by Human mode: steady club-strength calculation and a wide candidate pool for realistic play.</p>
-          </div>
-        </div>
-
-        <!-- Maia 3 -->
-        <div class="engine-group" data-engine="maia3" role="group" aria-label="Maia 3 engine settings">
-          <div class="switch-row">
-            <div><p class="switch-row__title">Maia 3 (human-like)</p></div>
-            <label class="switch">
-              <input type="checkbox" id="setting-use-maia3" checked>
-              <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
-              <span class="visually-hidden">Use Maia 3 human-like engine</span>
-            </label>
-          </div>
-          <div class="engine-group__body">
-            <div class="switch-row">
-              <div>
-                <p class="switch-row__title">Maia exclusive</p>
-                <p class="help-text">Use only Maia 3 as the hint source, with its own settings below.</p>
-              </div>
-              <label class="switch">
-                <input type="checkbox" id="setting-maia-only" checked="false">
-                <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
-                <span class="visually-hidden">Use only Maia 3 as the hint source</span>
-              </label>
-            </div>
-
-            <div id="maia-settings-block" hidden>
-              <div class="slider-row" id="maia-rating-row">
-                <div class="slider-row__header">
-                  <label class="switch-row__title" for="setting-maia-rating">Maia rating</label>
-                  <output id="maia-rating-value" class="slider-row__value" for="setting-maia-rating">1500</output>
-                </div>
-                <div class="slider" data-md-slider>
-                  <input type="range" id="setting-maia-rating" min="600" max="2600" step="100" value="1500" aria-label="Maia rating">
-                  <span class="slider__track" aria-hidden="true"></span>
-                  <span class="slider__fill" aria-hidden="true"></span>
-                  <span class="slider__handle" aria-hidden="true"><span class="slider__handle-dot"></span></span>
-                </div>
-                <div class="slider__scale" aria-hidden="true">
-                  <span>600</span><span>1100</span><span>1600</span><span>2100</span><span>2600</span>
-                </div>
-                <p class="help-text">Which skill level Maia imitates. Human-like play is built in: style and play-human stay off.</p>
-              </div>
-
-              <p class="field-label">Maia lines</p>
-              <div class="segmented" role="radiogroup" aria-label="Maia candidate lines">
-                <button type="button" class="segmented__item" data-expressive-setting="setting-maia-lines" data-value="auto" role="radio" aria-checked="true">Auto</button>
-                <button type="button" class="segmented__item" data-expressive-setting="setting-maia-lines" data-value="3" role="radio" aria-checked="false">3</button>
-                <button type="button" class="segmented__item" data-expressive-setting="setting-maia-lines" data-value="5" role="radio" aria-checked="false">5</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Masters DB -->
-        <div class="engine-group" data-engine="masters-explorer" role="group" aria-label="Masters database settings">
-          <div class="switch-row">
-            <div><p class="switch-row__title">Masters database</p></div>
-            <label class="switch">
-              <input type="checkbox" id="setting-use-masters-explorer" checked>
-              <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
-              <span class="visually-hidden">Use Lichess Masters Database</span>
-            </label>
-          </div>
-          <div class="engine-group__body">
-            <p class="help-text">Opening preference only. Engines take over after move five.</p>
-          </div>
-        </div>
-      </section>
-
-      <!-- Provider pulse -->
-      <section class="settings-block" aria-labelledby="set-health">
-        <h3 id="set-health" class="settings-block__title">Provider pulse</h3>
-        <div id="api-health-status" class="health-grid">
-          <div class="health-row"><span>Chess-API.com</span><span id="health-chessapi" class="api-status unknown">No recent data</span></div>
-          <div class="health-row"><span>Lichess Cloud</span><span id="health-lichess" class="api-status unknown">No recent data</span></div>
-          <div class="health-row"><span>Maia 3</span><span id="health-maia3" class="api-status unknown">No recent data</span></div>
-          <div class="health-row"><span>Masters DB</span><span id="health-masters" class="api-status unknown">No recent data</span></div>
-          <div class="health-row"><span>Opening Explorer</span><span id="health-opening" class="api-status unknown">No recent data</span></div>
-          <div class="health-row"><span>Tablebase</span><span id="health-tablebase" class="api-status unknown">No recent data</span></div>
-        </div>
-        <p class="help-text">Status comes from real requests. Refreshing this list does not ping providers.</p>
-
-        <div class="diagnostics">
-          <header class="diagnostics__head">
-            <span class="diagnostics__badge" aria-hidden="true"></span>
-            <p class="diagnostics__title">Last 10 minutes</p>
-          </header>
-          <div class="diagnostics__grid">
-            <div class="diagnostics__stat diagnostics__stat--saved">
-              <span class="diagnostics__icon" aria-hidden="true"></span>
-              <div class="diagnostics__text">
-                <strong id="api-cache-avoided">0</strong>
-                <span>Cache avoided</span>
-              </div>
-            </div>
-            <div class="diagnostics__stat diagnostics__stat--coalesced">
-              <span class="diagnostics__icon" aria-hidden="true"></span>
-              <div class="diagnostics__text">
-                <strong id="api-requests-coalesced">0</strong>
-                <span>Coalesced</span>
-              </div>
-            </div>
-            <div class="diagnostics__stat diagnostics__stat--stale-served">
-              <span class="diagnostics__icon" aria-hidden="true"></span>
-              <div class="diagnostics__text">
-                <strong id="api-stale-served">0</strong>
-                <span>Stale served</span>
-              </div>
-            </div>
-            <div class="diagnostics__stat diagnostics__stat--stale-dropped">
-              <span class="diagnostics__icon" aria-hidden="true"></span>
-              <div class="diagnostics__text">
-                <strong id="api-stale-dropped">0</strong>
-                <span>Stale dropped</span>
-              </div>
-            </div>
-          </div>
-          <footer class="diagnostics__foot">
-            <span class="diagnostics__dot" aria-hidden="true"></span>
-            <p id="api-provider-calls" class="provider-calls">No remote calls yet</p>
-          </footer>
-        </div>
-
-        <div class="btn-row">
-          <button id="btn-health-check" type="button" class="btn btn--tonal">Refresh status</button>
-          <button id="btn-clear-caches" type="button" class="btn btn--outlined">Clear caches</button>
-        </div>
-      </section>
-
-      <p class="disclaimer">Request protection is always on: caching, quotas, cooldowns, and stale fallback cannot be disabled.</p>
-      <p class="version-stamp" id="app-version-stamp"></p>
-    </div>
-  </div>
-
-  <!-- Main App Shell -->
   <div id="app" class="app">
-    <!-- App Bar -->
+    <div id="toast-container" class="snackbar-host" role="region" aria-live="polite" aria-label="Notifications"></div>
+
+    <!-- ══════════ APP BAR ══════════ -->
     <header class="app-bar" role="banner">
-      <div class="app-bar__identity">
-        <div class="brand-mark" aria-hidden="true">
-          <span class="brand-mark__shape"></span>
-          <svg viewBox="0 0 24 24" width="22" height="22"><path fill="currentColor" d="M19 22H5v-2h14v2Zm-2-5H7l-1 3h12l-1-3Zm-1 0c0-2.5 1.5-4 1.5-6.5C17.5 7.5 15 5 12 5c-1 0-2 .3-2.8.8C10.5 6.5 11 8 10.5 9.5 10 11 8.5 11.5 7 11.5 7 14 8.5 15.5 9.5 17H16Z"/></svg>
-        </div>
-        <div class="app-bar__titles">
-          <p class="app-bar__eyebrow">Study coach</p>
-          <h1 class="app-bar__title">Flux</h1>
+      <div class="app-bar__brand">
+        <span class="brand-knight" aria-hidden="true">♞</span>
+        <div>
+          <span class="app-bar__title">Chess Coach</span>
+          <span class="app-bar__sub">Study coach</span>
         </div>
       </div>
       <div class="app-bar__actions">
         <div id="player-selector" class="side-switch" role="radiogroup" aria-label="Which side to coach" data-selected="w">
-          <span class="side-switch__track" aria-hidden="true">
-            <svg class="side-switch__king side-switch__king--white" viewBox="0 0 298 298" aria-hidden="true"><path fill="currentColor" d="M197.333,256h-1.641c1.878-3.337,7.061-14.536-0.605-25.6c-7.554-10.905-21.491-39.547-20.904-64.401c4.409-0.01,7.816-3.587,7.816-7.999v-1c0-4.418-3.582-8-8-8c4.418,0,8-3.582,8-8v-1c0-4.418-3.249-8-7.667-8h-3.55c-1.006-16.142,1.307-29.861,4.798-40.724c1.121-3.487,2.432-6.186,3.752-8.276h2c4.418,0,7.667-3.582,7.667-8v-1c0-4.343-3.463-7.87-7.777-7.988C179.087,52.771,169,42.203,156,39.363V27h12V12h-12V0h-15v12h-12v15h12v12.595c-12,3.15-21.803,13.512-23.888,26.405h-0.779c-4.418,0-8.333,3.582-8.333,8v1c0,4.418,3.915,8,8.333,8h3c1.32,2.091,2.631,4.789,3.752,8.276c3.491,10.862,5.804,24.582,4.798,40.724h-4.55c-4.418,0-8.333,3.582-8.333,8v1c0,4.418,3.915,8,8.333,8h1.053c0.588,24.855-13.183,53.495-20.737,64.4c-7.664,11.063-2.482,22.263-0.604,25.6h-1.711c-4.418,0-8.333,3.582-8.333,8v9c0,3.727,3,6.849,6,7.737V298h100v-17.263c4-0.889,6-4.011,6-7.737v-9C205,259.582,201.751,256,197.333,256z"/></svg>
-          </span>
-          <span class="side-switch__thumb" aria-hidden="true">
-            <svg class="side-switch__king" viewBox="0 0 298 298" aria-hidden="true"><path fill="currentColor" d="M197.333,256h-1.641c1.878-3.337,7.061-14.536-0.605-25.6c-7.554-10.905-21.491-39.547-20.904-64.401c4.409-0.01,7.816-3.587,7.816-7.999v-1c0-4.418-3.582-8-8-8c4.418,0,8-3.582,8-8v-1c0-4.418-3.249-8-7.667-8h-3.55c-1.006-16.142,1.307-29.861,4.798-40.724c1.121-3.487,2.432-6.186,3.752-8.276h2c4.418,0,7.667-3.582,7.667-8v-1c0-4.343-3.463-7.87-7.777-7.988C179.087,52.771,169,42.203,156,39.363V27h12V12h-12V0h-15v12h-12v15h12v12.595c-12,3.15-21.803,13.512-23.888,26.405h-0.779c-4.418,0-8.333,3.582-8.333,8v1c0,4.418,3.915,8,8.333,8h3c1.32,2.091,2.631,4.789,3.752,8.276c3.491,10.862,5.804,24.582,4.798,40.724h-4.55c-4.418,0-8.333,3.582-8.333,8v1c0,4.418,3.915,8,8.333,8h1.053c0.588,24.855-13.183,53.495-20.737,64.4c-7.664,11.063-2.482,22.263-0.604,25.6h-1.711c-4.418,0-8.333,3.582-8.333,8v9c0,3.727,3,6.849,6,7.737V298h100v-17.263c4-0.889,6-4.011,6-7.737v-9C205,259.582,201.751,256,197.333,256z"/></svg>
-          </span>
+          <span class="side-switch__track" aria-hidden="true"><span class="k k-w pw">♚</span><span class="k k-b pb">♚</span></span>
+          <span class="side-switch__thumb" aria-hidden="true"></span>
           <button type="button" class="side-switch__hit player-btn" data-color="w" role="radio" aria-checked="true" aria-label="Coach White"></button>
           <button type="button" class="side-switch__hit player-btn" data-color="b" role="radio" aria-checked="false" aria-label="Coach Black"></button>
         </div>
-        <button id="btn-settings" class="icon-btn icon-btn--tonal" type="button" title="Settings (S)" aria-label="Open settings">
-          <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 1 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.2 7.2 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.59.22-1.14.53-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.48a.5.5 0 0 0 .12.64L4.86 10.7c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 1-.12.64l1.92 3.32c.13.23.4.32.64.22l2.39-.96c.5.41 1.04.72 1.63.94l.36 2.54c.05.24.25.42.49.42h3.8c.24 0 .44-.18.49-.42l.36-2.54c.59-.22 1.14-.53 1.63-.94l2.39.96c.24.1.51 0 .64-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/></svg>
-        </button>
+        <button id="btn-refresh" class="icon-btn" type="button" title="Refresh analysis (R)" aria-label="Refresh analysis"><i class="icon i-refresh"></i></button>
+        <button id="btn-settings" class="icon-btn" type="button" title="Settings (S)" aria-label="Open settings"><i class="icon i-gear"></i></button>
       </div>
     </header>
 
-    <!-- Engine Status -->
-    <div id="engine-status" class="status" role="status" aria-live="polite">
-      <span class="loading" aria-hidden="true">
-        <span class="loading__blob"></span>
-      </span>
-      <span class="status-dot connecting" aria-hidden="true"></span>
-      <span class="status-text">Connecting…</span>
-      <div id="position-context" class="status__meta pending" aria-label="Turn status">
-        <span id="position-turn" class="context-turn">Waiting for a game</span>
-      </div>
-    </div>
-
-    <!-- Canvas -->
+    <!-- ══════════ CANVAS ══════════ -->
     <main class="canvas" id="canvas">
-      <!-- Hero: Recommended Move -->
-      <section id="hint-section" class="hero" aria-label="Recommended move">
-        <div class="hero__kicker-wrap">
-          <span class="hero__kicker">Your move</span>
-        </div>
-        <div id="hint-card" class="hero__stage exact-move hint-card" aria-live="polite">
-          <!-- Welcome state (no board detected) -->
-          <div id="hero-welcome" class="welcome" aria-hidden="false">
-            <span class="welcome__blob" aria-hidden="true"></span>
-            <svg class="welcome__knight" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><path fill="currentColor" d="M19 22H5v-2h14v2Zm-2-5H7l-1 3h12l-1-3Zm-1 0c0-2.5 1.5-4 1.5-6.5C17.5 7.5 15 5 12 5c-1 0-2 .3-2.8.8C10.5 6.5 11 8 10.5 9.5 10 11 8.5 11.5 7 11.5 7 14 8.5 15.5 9.5 17H16Z"/></svg>
-            <p class="welcome__title">Open a game</p>
-            <p class="welcome__sub">Your coach wakes up the moment a board appears.</p>
+      <!-- HERO: recommended move (§8.2) -->
+      <section id="hint-section" class="hero" data-mode="auto" data-state="ok" aria-label="Recommended move">
+        <div class="hero__kicker">Your move</div>
+        <div id="hint-card" class="hero__stage" aria-live="polite">
+          <div id="hero-welcome" class="welcome">
+            <div class="welcome__big">♞ Waiting for board…</div>
+            <p class="welcome__sub">Connect a game and the coach appears here — invisible until it matters.</p>
           </div>
-
-          <p id="hint-text" class="hero__hint">Waiting for a board…</p>
-
-          <div id="hint-fromto" class="move-lockup" style="display:none" aria-label="Move squares"></div>
-
-          <span id="hint-attack-tag" class="hero__tag attack" hidden></span>
-
-          <div id="fair-play-warning" class="warning warning--error" style="display:none" role="alert">
-            <span class="warning__icon" aria-hidden="true"></span>
-            <span id="fair-play-warning-text" class="warning__text"></span>
+          <p id="hint-text" class="hero__hint" hidden></p>
+          <div id="hint-fromto" class="move-lockup" hidden>
+            <span id="lockup-piece" class="piece-chip" aria-hidden="true">♟</span>
+            <span class="move-lockup__copy">
+              <span id="lockup-san" class="hero__san">—</span>
+              <span id="hero-path" class="hero__path"></span>
+            </span>
+          </div>
+          <div id="fair-play-warning" class="hero__blocked" hidden role="alert">
+            <span class="ichip" aria-hidden="true"></span>
+            <span><b>Analysis paused</b><span id="fair-play-warning-text"></span></span>
           </div>
         </div>
+        <span id="hint-attack-tag" class="hero__tag" hidden>Attack</span>
       </section>
 
-      <!-- Caption Rail: Why This Move -->
+      <!-- CAPTION RAIL: why this move (§8.3) -->
       <section id="idea-section" class="caption-rail" hidden aria-label="Why this move">
         <h2 class="caption-rail__title">Why this move</h2>
         <ul id="idea-list" class="caption-rail__list" role="list"></ul>
       </section>
 
-      <!-- Alternatives -->
+      <!-- ALTERNATIVES (§8.8) -->
       <section id="alts-section" class="alts" hidden aria-label="Alternative good moves">
         <h2 class="alts__title">Also consider</h2>
         <ul id="alts-list" class="alts__list" role="list"></ul>
       </section>
 
-      <!-- Balance (Evaluation) -->
+      <!-- BALANCE: evaluation (§8.4) -->
       <section id="eval-section" class="balance" data-lean="even" data-state="empty" aria-label="Position evaluation">
-        <span class="balance__orb balance__orb--a" aria-hidden="true"></span>
-        <span class="balance__orb balance__orb--b" aria-hidden="true"></span>
+        <div class="balance__orbs" aria-hidden="true"><span class="orb orb--w"></span><span class="orb orb--b"></span></div>
         <div class="balance__head">
           <div class="balance__kicker-row">
             <span class="balance__kicker">Balance</span>
@@ -430,12 +85,12 @@
         <div class="balance__ribbon">
           <div id="eval-bar" class="eval-bar" role="meter" aria-label="Evaluation" aria-valuemin="-10" aria-valuemax="10" aria-valuenow="0" aria-valuetext="0.0">
             <div id="eval-bar-white" class="eval-bar__fill"></div>
-            <span id="eval-bar-white-pct" class="eval-bar__pct eval-bar__pct--left" aria-hidden="true"></span>
-            <span id="eval-bar-black-pct" class="eval-bar__pct eval-bar__pct--right" aria-hidden="true"></span>
             <span class="eval-bar__fulcrum" aria-hidden="true"></span>
           </div>
+          <span id="eval-bar-white-pct" class="eval-bar__pct eval-bar__pct--left" aria-hidden="true"></span>
+          <span id="eval-bar-black-pct" class="eval-bar__pct eval-bar__pct--right" aria-hidden="true"></span>
         </div>
-        <svg id="eval-sparkline" class="balance__spark" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <svg id="eval-sparkline" class="balance__spark" viewBox="0 0 300 34" preserveAspectRatio="none" aria-hidden="true"></svg>
         <div class="balance__labels">
           <span class="balance__side">
             <span class="piece-dot piece-dot--white" aria-hidden="true"></span>
@@ -448,27 +103,26 @@
         </div>
       </section>
 
-      <!-- Critical Moment -->
-      <section id="critical-moment-section" class="banner banner--critical" hidden role="alert" aria-label="Critical moment">
-        <span class="banner__kicker">Critical moment</span>
-        <span class="banner__icon" aria-hidden="true"></span>
-        <p id="critical-moment-text" class="banner__title"></p>
-        <p id="critical-moment-detail" class="banner__detail"></p>
-      </section>
-
-      <!-- Verdict: Last Move Classification -->
-      <section id="move-class-section" class="verdict" data-verdict="none" data-state="empty" aria-label="Last move classification" aria-live="polite">
-        <span class="verdict__burst" aria-hidden="true"></span>
-        <span class="verdict__kicker">Last move</span>
-        <div id="move-class-display" class="verdict__stage">
-          <div class="verdict__empty">
-            <span class="verdict__empty-icon" aria-hidden="true"></span>
-            <p class="verdict__empty-text">Play a move to see how it rated</p>
-          </div>
+      <!-- CRITICAL MOMENT (§8.5) -->
+      <section id="critical-moment-section" class="banner" hidden role="alert" aria-label="Critical moment">
+        <span class="ichip" aria-hidden="true"></span>
+        <div>
+          <span class="banner__kicker">Critical moment</span>
+          <p id="critical-moment-text" class="banner__title"></p>
+          <p id="critical-moment-detail" class="banner__detail"></p>
         </div>
       </section>
 
-      <!-- Position Facts -->
+      <!-- VERDICT: last move classification (§8.6) -->
+      <section id="move-class-section" class="verdict" data-verdict="none" data-state="empty" aria-label="Last move classification" aria-live="polite">
+        <div class="verdict__burst" aria-hidden="true"></div>
+        <span class="verdict__kicker">Last move</span>
+        <div id="move-class-display" class="verdict__stage">
+          <div class="verdict__empty">No classified move yet — play on.</div>
+        </div>
+      </section>
+
+      <!-- POSITION FACTS (§8.7) -->
       <section id="position-info" class="facts" aria-label="Position facts">
         <h2 class="facts__title">Position</h2>
         <dl class="facts__list">
@@ -482,13 +136,335 @@
       </section>
     </main>
 
-    <!-- Toolbar -->
+    <!-- ══════════ TOOLBAR: status + keys ══════════ -->
     <footer class="toolbar" role="contentinfo">
-      <div class="toolbar__label">Exact move · study only</div>
-      <button id="btn-refresh" class="fab" type="button" title="Refresh analysis (R)" aria-label="Refresh analysis">
-        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M17.65 6.35A7.95 7.95 0 0 0 12 4a8 8 0 1 0 7.45 5.1h-2.21A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35Z"/></svg>
-      </button>
+      <span id="engine-status" class="toolbar__status" role="status" aria-live="polite">
+        <span class="toolbar__dot status-dot connecting" aria-hidden="true"></span>
+        <span class="status-text toolbar__text">Connecting…</span>
+      </span>
+      <span id="position-context" class="toolbar__meta pending" aria-label="Turn status">
+        <span id="position-turn" class="context-turn">Waiting for a game</span>
+      </span>
+      <span class="toolbar__keys" aria-hidden="true">R · S · ?</span>
     </footer>
+
+    <!-- ══════════ SETTINGS SHEET (§8.10) ══════════ -->
+    <div id="sheet-scrim" class="scrim" hidden></div>
+    <div id="settings-sheet" class="sheet" role="dialog" aria-modal="true" aria-labelledby="settings-title" hidden>
+      <header class="sheet__bar">
+        <div>
+          <p class="sheet__eyebrow">Saved automatically</p>
+          <h2 id="settings-title" class="sheet__title">Tune the coach</h2>
+        </div>
+        <button id="btn-close-settings" class="icon-btn" type="button" aria-label="Close settings"><i class="icon i-close"></i></button>
+      </header>
+
+      <div class="sheet__body">
+        <!-- What to show -->
+        <section class="settings-block" aria-labelledby="set-show">
+          <h3 id="set-show" class="settings-block__title">What to show</h3>
+
+          <div class="switch-row">
+            <div>
+              <span class="switch-row__title">Analyze on my turn</span>
+              <span class="help-text">No requests while the opponent is thinking.</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="setting-auto-analyze" checked>
+              <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
+              <span class="visually-hidden">Auto-analyze on your turn</span>
+            </label>
+          </div>
+
+          <div class="switch-row">
+            <div><span class="switch-row__title">Threat alerts</span></div>
+            <label class="switch">
+              <input type="checkbox" id="setting-show-threats" checked>
+              <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
+              <span class="visually-hidden">Threat alerts</span>
+            </label>
+          </div>
+
+          <div class="switch-row">
+            <div><span class="switch-row__title">Critical moments</span></div>
+            <label class="switch">
+              <input type="checkbox" id="setting-show-critical-moments" checked>
+              <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
+              <span class="visually-hidden">Critical moment alerts</span>
+            </label>
+          </div>
+        </section>
+
+        <!-- Analysis sources -->
+        <section class="settings-block" aria-labelledby="set-sources">
+          <h3 id="set-sources" class="settings-block__title">Analysis sources</h3>
+          <p class="help-text">Each engine runs with its own settings. Turn one off to hide its options.</p>
+
+          <!-- Chess-API -->
+          <div class="engine-group" data-engine="chess-api" role="group" aria-label="Chess-API engine settings">
+            <div class="switch-row">
+              <div><span class="switch-row__title">Chess-API.com</span></div>
+              <label class="switch">
+                <input type="checkbox" id="setting-use-chess-api" checked>
+                <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
+                <span class="visually-hidden">Use Chess-API.com</span>
+              </label>
+            </div>
+            <div class="engine-group__body">
+              <p class="help-text">Stockfish 18 · live depth ~12–18.</p>
+              <p class="field-label">Quality</p>
+              <div class="segmented" role="radiogroup" aria-label="Analysis quality">
+                <button type="button" class="segmented__item" data-expressive-setting="setting-analysis-quality" data-value="auto" role="radio" aria-checked="true">Auto</button>
+                <button type="button" class="segmented__item" data-expressive-setting="setting-analysis-quality" data-value="fast" role="radio" aria-checked="false">Fast</button>
+                <button type="button" class="segmented__item" data-expressive-setting="setting-analysis-quality" data-value="balanced" role="radio" aria-checked="false">Balanced</button>
+                <button type="button" class="segmented__item" data-expressive-setting="setting-analysis-quality" data-value="deep" role="radio" aria-checked="false">Deep</button>
+              </div>
+              <p class="help-text">Sets engine depth and local fallback effort.</p>
+            </div>
+          </div>
+
+          <!-- Lichess Cloud -->
+          <div class="engine-group" data-engine="lichess-cloud" role="group" aria-label="Lichess Cloud engine settings">
+            <div class="switch-row">
+              <div><span class="switch-row__title">Lichess Cloud</span></div>
+              <label class="switch">
+                <input type="checkbox" id="setting-use-lichess-cloud" checked>
+                <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
+                <span class="visually-hidden">Use Lichess Cloud Evaluation</span>
+              </label>
+            </div>
+            <div class="engine-group__body">
+              <p class="help-text">Cached depth 40–75+ · instant when the position is warm.</p>
+              <p class="field-label">Candidate lines</p>
+              <div class="segmented" role="radiogroup" aria-label="Candidate lines">
+                <button type="button" class="segmented__item" data-expressive-setting="setting-candidate-lines" data-value="auto" role="radio" aria-checked="true">Auto</button>
+                <button type="button" class="segmented__item" data-expressive-setting="setting-candidate-lines" data-value="3" role="radio" aria-checked="false">3</button>
+                <button type="button" class="segmented__item" data-expressive-setting="setting-candidate-lines" data-value="5" role="radio" aria-checked="false">5</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Engine Style -->
+          <div class="engine-group" data-engine="engine-style" role="group" aria-label="Engine style settings">
+            <div class="switch-row">
+              <div>
+                <span class="switch-row__title">Engine style</span>
+                <span class="help-text">Chess-API · Lichess Cloud only. Maia and Masters ignore it.</span>
+              </div>
+            </div>
+            <div class="engine-group__body">
+              <div class="choice-stack" role="radiogroup" aria-label="Playing style">
+                <button type="button" class="choice" data-expressive-setting="setting-style" data-value="normal" role="radio" aria-checked="true">
+                  <span class="choice__title">Normal</span>
+                  <span class="choice__sub">Objective best play</span>
+                </button>
+                <button type="button" class="choice" data-expressive-setting="setting-style" data-value="aggressive" role="radio" aria-checked="false">
+                  <span class="choice__title">Aggressive</span>
+                  <span class="choice__sub">Fastest sound win</span>
+                </button>
+                <button type="button" class="choice" data-expressive-setting="setting-style" data-value="super_ultra_aggressive" role="radio" aria-checked="false">
+                  <span class="choice__title">Ultra attack</span>
+                  <span class="choice__sub">Maximum pressure vs ≤1100</span>
+                </button>
+              </div>
+              <p id="style-description" class="help-text">Objective best play, reliable conversion, and solid defense.</p>
+
+              <!-- Early King Hunt (style-gated) -->
+              <div id="early-king-hunt-setting" class="switch-row early-king-hunt-setting" hidden>
+                <div>
+                  <span class="switch-row__title">Early King Hunt</span>
+                  <span class="help-text">Force an early direct attack while Ultra attack is on.</span>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="setting-early-king-hunt" disabled>
+                  <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
+                  <span class="visually-hidden">Early King Hunt</span>
+                </label>
+              </div>
+
+              <!-- Play human -->
+              <div class="switch-row">
+                <div>
+                  <span class="switch-row__title">Play human</span>
+                  <span class="human-mode-status visually-hidden">Off</span>
+                </div>
+                <input type="checkbox" id="setting-human-like-mode" class="human-mode-checkbox visually-hidden">
+                <div class="segmented segmented--connected human-mode-segmented" role="radiogroup" aria-label="Move voice">
+                  <button type="button" class="segmented__item human-mode-opt" data-mode="off" data-expressive-setting="setting-human-like-mode" data-value="off" role="radio" aria-checked="true">Engine</button>
+                  <button type="button" class="segmented__item human-mode-opt" data-mode="on" data-expressive-setting="setting-human-like-mode" data-value="on" role="radio" aria-checked="false">Human</button>
+                </div>
+              </div>
+
+              <!-- Sparring strength (human mode only) -->
+              <div id="sparring-strength-row" class="slider-row" hidden>
+                <div class="slider-row__header">
+                  <label class="slider-row__title" for="setting-sparring-strength">Sparring strength</label>
+                  <output id="sparring-strength-value" class="slider-row__value" for="setting-sparring-strength">1100</output>
+                </div>
+                <div class="slider" data-md-slider>
+                  <input type="range" id="setting-sparring-strength" min="600" max="1600" step="50" value="1100" aria-label="Sparring strength rating">
+                  <span class="slider__track" aria-hidden="true"></span>
+                  <span class="slider__fill" aria-hidden="true"></span>
+                  <span class="slider__handle" aria-hidden="true"><span class="slider__handle-dot"></span></span>
+                </div>
+                <div class="slider__scale" aria-hidden="true">
+                  <span>600</span><span>800</span><span>1000</span><span>1200</span><span>1400</span><span>1600</span>
+                </div>
+                <p class="help-text">How strong the sparring partner plays in human mode.</p>
+              </div>
+
+              <p id="human-thinking-note" class="help-text" hidden>Managed by Human mode: steady club-strength calculation and a wide candidate pool for realistic play.</p>
+            </div>
+          </div>
+
+          <!-- Maia 3 -->
+          <div class="engine-group" data-engine="maia3" role="group" aria-label="Maia 3 engine settings">
+            <div class="switch-row">
+              <div><span class="switch-row__title">Maia 3 (human-like)</span></div>
+              <label class="switch">
+                <input type="checkbox" id="setting-use-maia3" checked>
+                <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
+                <span class="visually-hidden">Use Maia 3 human-like engine</span>
+              </label>
+            </div>
+            <div class="engine-group__body">
+              <div class="switch-row">
+                <div>
+                  <span class="switch-row__title">Maia exclusive</span>
+                  <span class="help-text">Use only Maia 3 as the hint source, with its own settings below.</span>
+                </div>
+                <label class="switch">
+                  <input type="checkbox" id="setting-maia-only">
+                  <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
+                  <span class="visually-hidden">Use only Maia 3 as the hint source</span>
+                </label>
+              </div>
+
+              <div id="maia-settings-block" hidden>
+                <div class="slider-row" id="maia-rating-row">
+                  <div class="slider-row__header">
+                    <label class="slider-row__title" for="setting-maia-rating">Maia rating</label>
+                    <output id="maia-rating-value" class="slider-row__value" for="setting-maia-rating">1500</output>
+                  </div>
+                  <div class="slider" data-md-slider>
+                    <input type="range" id="setting-maia-rating" min="600" max="2600" step="100" value="1500" aria-label="Maia rating">
+                    <span class="slider__track" aria-hidden="true"></span>
+                    <span class="slider__fill" aria-hidden="true"></span>
+                    <span class="slider__handle" aria-hidden="true"><span class="slider__handle-dot"></span></span>
+                  </div>
+                  <div class="slider__scale" aria-hidden="true">
+                    <span>600</span><span>1100</span><span>1600</span><span>2100</span><span>2600</span>
+                  </div>
+                  <p class="help-text">Which skill level Maia imitates. Human-like play is built in: style and play-human stay off.</p>
+                </div>
+
+                <p class="field-label">Maia lines</p>
+                <div class="segmented" role="radiogroup" aria-label="Maia candidate lines">
+                  <button type="button" class="segmented__item" data-expressive-setting="setting-maia-lines" data-value="auto" role="radio" aria-checked="true">Auto</button>
+                  <button type="button" class="segmented__item" data-expressive-setting="setting-maia-lines" data-value="3" role="radio" aria-checked="false">3</button>
+                  <button type="button" class="segmented__item" data-expressive-setting="setting-maia-lines" data-value="5" role="radio" aria-checked="false">5</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Masters DB -->
+          <div class="engine-group" data-engine="masters-explorer" role="group" aria-label="Masters database settings">
+            <div class="switch-row">
+              <div><span class="switch-row__title">Masters database</span></div>
+              <label class="switch">
+                <input type="checkbox" id="setting-use-masters-explorer" checked>
+                <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
+                <span class="visually-hidden">Use Lichess Masters Database</span>
+              </label>
+            </div>
+            <div class="engine-group__body">
+              <p class="help-text">Opening preference only. Engines take over after move five.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Provider pulse -->
+        <section class="settings-block" aria-labelledby="set-health">
+          <h3 id="set-health" class="settings-block__title">Provider pulse</h3>
+          <div id="api-health-status" class="health-grid">
+            <div class="health-row"><span>Chess-API.com</span><span id="health-chessapi" class="api-status unknown">No recent data</span></div>
+            <div class="health-row"><span>Lichess Cloud</span><span id="health-lichess" class="api-status unknown">No recent data</span></div>
+            <div class="health-row"><span>Maia 3</span><span id="health-maia3" class="api-status unknown">No recent data</span></div>
+            <div class="health-row"><span>Masters DB</span><span id="health-masters" class="api-status unknown">No recent data</span></div>
+            <div class="health-row"><span>Opening Explorer</span><span id="health-opening" class="api-status unknown">No recent data</span></div>
+            <div class="health-row"><span>Tablebase</span><span id="health-tablebase" class="api-status unknown">No recent data</span></div>
+          </div>
+          <p class="help-text">Status comes from real requests. Refreshing this list does not ping providers.</p>
+
+          <div class="diagnostics">
+            <header class="diagnostics__head">
+              <span class="diagnostics__badge" aria-hidden="true"></span>
+              <p class="diagnostics__title">Last 10 minutes</p>
+            </header>
+            <div class="diagnostics__grid">
+              <div class="diagnostics__stat diagnostics__stat--saved">
+                <span class="diagnostics__icon" aria-hidden="true"></span>
+                <div class="diagnostics__text">
+                  <strong id="api-cache-avoided">0</strong>
+                  <span>Cache avoided</span>
+                </div>
+              </div>
+              <div class="diagnostics__stat diagnostics__stat--coalesced">
+                <span class="diagnostics__icon" aria-hidden="true"></span>
+                <div class="diagnostics__text">
+                  <strong id="api-requests-coalesced">0</strong>
+                  <span>Coalesced</span>
+                </div>
+              </div>
+              <div class="diagnostics__stat diagnostics__stat--stale-served">
+                <span class="diagnostics__icon" aria-hidden="true"></span>
+                <div class="diagnostics__text">
+                  <strong id="api-stale-served">0</strong>
+                  <span>Stale served</span>
+                </div>
+              </div>
+              <div class="diagnostics__stat diagnostics__stat--stale-dropped">
+                <span class="diagnostics__icon" aria-hidden="true"></span>
+                <div class="diagnostics__text">
+                  <strong id="api-stale-dropped">0</strong>
+                  <span>Stale dropped</span>
+                </div>
+              </div>
+            </div>
+            <footer class="diagnostics__foot">
+              <span class="diagnostics__dot" aria-hidden="true"></span>
+              <p id="api-provider-calls" class="provider-calls">No remote calls yet</p>
+            </footer>
+          </div>
+
+          <div class="btn-row">
+            <button id="btn-health-check" type="button" class="btn btn--filled">Refresh status</button>
+            <button id="btn-clear-caches" type="button" class="btn btn--tonal-opp">Clear caches</button>
+          </div>
+        </section>
+
+        <p class="disclaimer">Request protection is always on: caching, quotas, cooldowns, and stale fallback cannot be disabled.</p>
+        <p class="version-stamp" id="app-version-stamp"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ SHORTCUTS DIALOG ══════════ -->
+  <div id="shortcut-help" class="dialog" hidden role="dialog" aria-labelledby="shortcut-help-title" aria-modal="true">
+    <div class="dialog__scrim" data-close-shortcuts></div>
+    <div class="dialog__sheet">
+      <header class="dialog__bar">
+        <h2 id="shortcut-help-title" class="dialog__title">Shortcuts</h2>
+        <button id="btn-close-shortcut-help" class="icon-btn" type="button" aria-label="Close shortcuts"><i class="icon i-close"></i></button>
+      </header>
+      <div class="shortcut-list">
+        <div class="shortcut"><span>Refresh analysis</span><kbd>R</kbd></div>
+        <div class="shortcut"><span>Open settings</span><kbd>S</kbd></div>
+        <div class="shortcut"><span>Close</span><kbd>Esc</kbd></div>
+        <div class="shortcut"><span>Show shortcuts</span><kbd>?</kbd></div>
+      </div>
+    </div>
   </div>
 
   <script src="../engine/core-utils.js"></script>

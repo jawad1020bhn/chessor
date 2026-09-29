@@ -106,6 +106,7 @@
     statusText: $('.status-text'),
     positionContext: $('#position-context'),
     positionTurn: $('#position-turn'),
+    heroSection: $('#hint-section'),
     evalBarFill: $('#eval-bar-white'),
     evalBar: $('#eval-bar'),
     evalSection: $('#eval-section'),
@@ -122,9 +123,13 @@
     materialBalance: $('#material-balance'),
     hintText: $('#hint-text'),
     hintFromTo: $('#hint-fromto'),
+    lockupPiece: $('#lockup-piece'),
+    lockupSan: $('#lockup-san'),
+    heroPath: $('#hero-path'),
     hintAttackTag: $('#hint-attack-tag'),
     heroWelcome: $('#hero-welcome'),
     hintCard: $('#hint-card'),
+    sheetScrim: $('#sheet-scrim'),
     ideaSection: $('#idea-section'),
     ideaList: $('#idea-list'),
     altsSection: $('#alts-section'),
@@ -240,34 +245,53 @@
     } catch (e) {}
   }
 
-  // ─── Toast System ─────────────────────────────────────────────────
-  const TOAST_DURATION = 3500;
+  // ─── Toast System (§9.5 — raised chips, drag-to-fling) ────────────
+  const TOAST_DURATION = 4200;
   const TOAST_MAX = 3;
+  const TOAST_KIND = { success: 'you', error: 'opp', warning: 'attack', info: 'neutral' };
 
   function showToast(message, type = 'info', duration = TOAST_DURATION) {
     const container = document.getElementById('toast-container');
     if (!container) return;
-    while (container.children.length >= TOAST_MAX) {
+    // Evict overflow synchronously: dismissToast only animates, it does not
+    // detach the node, so a `while (children.length >= MAX)` guard would
+    // never terminate. Remove each evicted node from the DOM immediately.
+    const overflow = container.children.length - (TOAST_MAX - 1);
+    for (let i = 0; i < overflow; i++) {
       const oldest = container.firstElementChild;
-      if (oldest) oldest.remove();
+      if (!oldest) break;
+      dismissToast(oldest, 1);
+      oldest.remove();
     }
-    const safeType = Object.hasOwn({ success: 1, error: 1, warning: 1, info: 1 }, type) ? type : 'info';
+    const kind = TOAST_KIND[type] || 'neutral';
     const toast = document.createElement('div');
-    toast.className = `toast toast-${safeType}`;
-    const icon = document.createElement('span');
-    icon.className = 'toast-icon';
-    icon.setAttribute('aria-hidden', 'true');
-    const messageElement = document.createElement('span');
-    messageElement.className = 'toast-message';
-    messageElement.textContent = String(message ?? '');
-    toast.append(icon, messageElement);
+    toast.className = `toast toast--${kind}`;
+    // §10: toasts announce assertively only when they carry an error.
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    const chip = document.createElement('span');
+    chip.className = 'toast__chip';
+    chip.setAttribute('aria-hidden', 'true');
+    const body = document.createElement('div');
+    body.className = 'toast__body';
+    body.textContent = String(message ?? '');
+    const close = document.createElement('button');
+    close.className = 'toast__x';
+    close.type = 'button';
+    close.setAttribute('aria-label', 'Dismiss');
+    close.addEventListener('click', () => dismissToast(toast, 1));
+    toast.append(chip, body, close);
     container.appendChild(toast);
     attachSwipeDismiss(toast);
-    setTimeout(() => {
-      if (!toast.isConnected) return;
-      toast.classList.add('toast-exit');
-      setTimeout(() => toast.remove(), 300);
-    }, duration);
+    toast._timer = setTimeout(() => dismissToast(toast, 1), duration);
+  }
+
+  function dismissToast(toast, dir) {
+    if (!toast || toast._gone) return;
+    toast._gone = true;
+    clearTimeout(toast._timer);
+    toast.classList.add('toast-exit');
+    toast.style.setProperty('--fling', `${(dir || 1) * 420}px`);
+    setTimeout(() => toast.remove(), REDUCED_MOTION ? 0 : 240);
   }
 
   function attachSwipeDismiss(toast) {
@@ -277,10 +301,7 @@
       if (startX === null) return;
       startX = null;
       if (Math.abs(dx) > 56) {
-        toast.classList.add('dismiss-swipe');
-        toast.style.transform = `translateX(${dx > 0 ? 130 : -130}%)`;
-        toast.style.opacity = '0';
-        setTimeout(() => toast.remove(), 240);
+        dismissToast(toast, Math.sign(dx));
       } else if (dx !== 0) {
         toast.classList.add('dismiss-swipe');
         toast.style.transform = '';
@@ -289,13 +310,14 @@
       dx = 0;
     };
     toast.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('button')) return;
       startX = e.clientX;
       try { toast.setPointerCapture(e.pointerId); } catch (err) {}
     });
     toast.addEventListener('pointermove', (e) => {
       if (startX === null) return;
       dx = e.clientX - startX;
-      if (Math.abs(dx) > 4) toast.style.transform = `translateX(${dx}px)`;
+      if (Math.abs(dx) > 4) toast.style.transform = `translateX(${dx}px) rotate(${dx / 38}deg)`;
     });
     toast.addEventListener('pointerup', settle);
     toast.addEventListener('pointercancel', settle);
@@ -309,8 +331,8 @@
   function openShortcuts() {
     if (!shortcutDialog) return;
     shortcutHelpVisible = true;
-    shortcutDialog.classList.remove('dialog--closing');
     shortcutDialog.hidden = false;
+    requestAnimationFrame(() => shortcutDialog.classList.add('show'));
     const closeBtn = document.getElementById('btn-close-shortcut-help');
     if (closeBtn) closeBtn.focus();
   }
@@ -318,12 +340,11 @@
   function closeShortcuts() {
     if (!shortcutDialog || shortcutDialog.hidden) return;
     shortcutHelpVisible = false;
-    shortcutDialog.classList.add('dialog--closing');
+    shortcutDialog.classList.remove('show');
     setTimeout(() => {
       shortcutDialog.hidden = true;
-      shortcutDialog.classList.remove('dialog--closing');
       if (dom.btnSettings) dom.btnSettings.focus();
-    }, REDUCED_MOTION ? 0 : 200);
+    }, REDUCED_MOTION ? 0 : 300);
   }
 
   function initKeyboardShortcuts() {
@@ -344,9 +365,7 @@
           break;
         case 's':
           e.preventDefault();
-          if (dom.settingsSheet && dom.settingsSheet.classList.contains('sheet--closing')) {
-            openSettingsSheet();
-          } else if (dom.settingsSheet && !dom.settingsSheet.hidden) {
+          if (dom.settingsSheet && !dom.settingsSheet.hidden && dom.settingsSheet.classList.contains('open')) {
             closeSettingsSheet();
           } else {
             openSettingsSheet();
@@ -448,7 +467,7 @@
   // ─── Balance States ────────────────────────────────────────────────
   function setBalanceLoadingState(hasPrevScore = false) {
     if (dom.evalSection) dom.evalSection.dataset.state = 'loading';
-    if (dom.evalStaleBadge) dom.evalStaleBadge.style.display = 'none';
+    if (dom.evalStaleBadge) dom.evalStaleBadge.hidden = true;
     if (!hasPrevScore) {
       renderBalanceSkeleton();
     } else if (dom.evalDescription) {
@@ -472,13 +491,12 @@
     if (dom.evalSection) {
       dom.evalSection.dataset.state = 'error';
       dom.evalSection.dataset.lean = 'even';
-      dom.evalSection.style.setProperty('--eval-pct', '50');
     }
     if (dom.evalDescription) dom.evalDescription.textContent = errorMsg;
-    if (dom.evalStaleBadge) dom.evalStaleBadge.style.display = 'none';
+    if (dom.evalStaleBadge) dom.evalStaleBadge.hidden = true;
     if (dom.evalWhiteLabel) dom.evalWhiteLabel.textContent = '—';
     if (dom.evalBlackLabel) dom.evalBlackLabel.textContent = '—';
-    if (dom.evalBarFill) dom.evalBarFill.style.transform = 'scaleX(0.5)';
+    if (dom.evalBarFill) { dom.evalBarFill.style.width = '0%'; dom.evalBarFill.classList.remove('neg'); }
     renderEvalSparkline();
   }
 
@@ -486,13 +504,12 @@
     if (dom.evalSection) {
       dom.evalSection.dataset.state = 'empty';
       dom.evalSection.dataset.lean = 'even';
-      dom.evalSection.style.setProperty('--eval-pct', '50');
     }
     if (dom.evalDescription) dom.evalDescription.textContent = 'Waiting for analysis…';
-    if (dom.evalStaleBadge) dom.evalStaleBadge.style.display = 'none';
+    if (dom.evalStaleBadge) dom.evalStaleBadge.hidden = true;
     if (dom.evalWhiteLabel) dom.evalWhiteLabel.textContent = '—';
     if (dom.evalBlackLabel) dom.evalBlackLabel.textContent = '—';
-    if (dom.evalBarFill) dom.evalBarFill.style.transform = 'scaleX(0.5)';
+    if (dom.evalBarFill) { dom.evalBarFill.style.width = '0%'; dom.evalBarFill.classList.remove('neg'); }
     renderEvalSparkline();
   }
 
@@ -743,27 +760,30 @@
 
   function openSettingsSheet() {
     if (!dom.settingsSheet) return;
-    if (settingsSheetCloseTimer) clearTimeout(settingsSheetCloseTimer);
-    dom.settingsSheet.classList.remove('sheet--closing');
+    if (settingsSheetCloseTimer) { clearTimeout(settingsSheetCloseTimer); settingsSheetCloseTimer = null; }
     dom.settingsSheet.hidden = false;
+    if (dom.sheetScrim) dom.sheetScrim.hidden = false;
+    requestAnimationFrame(() => {
+      dom.settingsSheet.classList.add('open');
+      if (dom.sheetScrim) dom.sheetScrim.classList.add('show');
+    });
     syncAllSliders();
     runHealthCheck();
   }
 
   function closeSettingsSheet() {
-    if (!dom.settingsSheet) return;
-    if (!dom.settingsSheet.hidden || dom.settingsSheet.classList.contains('sheet--closing')) {
-      dom.settingsSheet.classList.add('sheet--closing');
-      settingsSheetCloseTimer = setTimeout(() => {
-        dom.settingsSheet.hidden = true;
-        dom.settingsSheet.classList.remove('sheet--closing');
-        settingsSheetCloseTimer = null;
-        // Return focus to the invoking control (§10 keyboard operability).
-        if (dom.settingsSheet.contains(document.activeElement) && dom.btnSettings) {
-          dom.btnSettings.focus();
-        }
-      }, REDUCED_MOTION ? 0 : 210);
-    }
+    if (!dom.settingsSheet || dom.settingsSheet.hidden) return;
+    dom.settingsSheet.classList.remove('open');
+    if (dom.sheetScrim) dom.sheetScrim.classList.remove('show');
+    settingsSheetCloseTimer = setTimeout(() => {
+      dom.settingsSheet.hidden = true;
+      if (dom.sheetScrim) dom.sheetScrim.hidden = true;
+      settingsSheetCloseTimer = null;
+      // Return focus to the invoking control (§10 keyboard operability).
+      if (dom.settingsSheet.contains(document.activeElement) && dom.btnSettings) {
+        dom.btnSettings.focus();
+      }
+    }, REDUCED_MOTION ? 0 : 440);
   }
 
   // ─── Health Check ─────────────────────────────────────────────────
@@ -864,7 +884,7 @@
   }
 
   function updateEngineStatus(status, text) {
-    if (dom.statusDot) dom.statusDot.className = `status-dot ${status}`;
+    if (dom.statusDot) dom.statusDot.className = `toolbar__dot status-dot ${status}`;
     if (dom.statusText) dom.statusText.textContent = text;
     const app = document.getElementById('app');
     if (app) app.classList.toggle('analyzing', status === 'analyzing' || status === 'connecting');
@@ -935,7 +955,7 @@
       waitingForOpponent = false;
       updateEngineStatus('unknown', 'Turn unavailable: waiting for a verified position');
       if (dom.hintText) dom.hintText.textContent = 'Turn information is unavailable for this board.';
-      if (dom.hintFromTo) dom.hintFromTo.style.display = 'none';
+      if (dom.hintFromTo) dom.hintFromTo.hidden = true;
       hideIdeaRail();
       return;
     }
@@ -948,7 +968,7 @@
       updateEngineStatus('online', `Opponent's turn: waiting...`);
       if (dom.hintText && !lastAnalysis) {
         dom.hintText.textContent = `Waiting for opponent's move...`;
-        if (dom.hintFromTo) dom.hintFromTo.style.display = 'none';
+        if (dom.hintFromTo) dom.hintFromTo.hidden = true;
       }
     }
   }
@@ -998,7 +1018,7 @@
     if (data.reason === 'turn_unknown') {
       updateEngineStatus('unknown', 'Turn unavailable: waiting for a verified position');
       if (dom.hintText) dom.hintText.textContent = 'Turn information is unavailable for this board.';
-      if (dom.hintFromTo) dom.hintFromTo.style.display = 'none';
+      if (dom.hintFromTo) dom.hintFromTo.hidden = true;
       return;
     }
 
@@ -1008,7 +1028,7 @@
       updateEngineStatus('online', "Opponent's turn: waiting...");
       if (dom.hintText && !lastAnalysis) {
         dom.hintText.textContent = `Waiting for opponent's move...`;
-        if (dom.hintFromTo) dom.hintFromTo.style.display = 'none';
+        if (dom.hintFromTo) dom.hintFromTo.hidden = true;
       }
     }
   }
@@ -1167,21 +1187,21 @@
     // warning text — no move lockup, no rails, no recommendation.
     const warning = document.getElementById('fair-play-warning');
     if (data.exactHintBlocked) {
-      if (dom.hintCard) dom.hintCard.classList.add('blocked');
-      if (dom.hintText) dom.hintText.textContent = '';
-      if (dom.hintFromTo) { dom.hintFromTo.style.display = 'none'; dom.hintFromTo.replaceChildren(); }
+      if (dom.heroSection) dom.heroSection.dataset.state = 'blocked';
+      if (dom.hintText) dom.hintText.hidden = true;
+      if (dom.hintFromTo) dom.hintFromTo.hidden = true;
       if (dom.hintAttackTag) dom.hintAttackTag.hidden = true;
       if (dom.altsSection) dom.altsSection.hidden = true;
       hideIdeaRail();
       if (warning) {
         const text = document.getElementById('fair-play-warning-text');
         if (text) text.textContent = data.exactHintBlocked.message || 'Exact hints unavailable for this position.';
-        warning.style.display = '';
+        warning.hidden = false;
       }
       return;
     }
-    if (dom.hintCard) dom.hintCard.classList.remove('blocked');
-    if (warning) warning.style.display = 'none';
+    if (dom.heroSection) dom.heroSection.dataset.state = 'ok';
+    if (warning) warning.hidden = true;
 
     renderPositionInfo(viewData);
     renderHints(viewData);
@@ -1197,8 +1217,13 @@
     const isWhite = effectiveColor === 'w';
     const displayScore = isWhite ? score : -score;
     const whiteWinPct = window.ChessHintEngine.formatEvalBar(score, scoreType, true);
-    const winFraction = whiteWinPct / 100;
-    if (dom.evalBarFill) dom.evalBarFill.style.transform = `scaleX(${winFraction})`;
+    if (dom.evalBarFill) {
+      // Center-out meter: width grows toward the leading side (§8.4).
+      const leanPct = (whiteWinPct - 50) / 50;           // -1 .. 1
+      const fillWidth = Math.min(Math.abs(leanPct), 1) * 50; // 0 .. 50%
+      dom.evalBarFill.classList.toggle('neg', leanPct < 0);
+      dom.evalBarFill.style.width = `${fillWidth}%`;
+    }
 
     const whiteShare = Math.round(whiteWinPct);
     const blackShare = 100 - whiteShare;
@@ -1216,12 +1241,10 @@
       const evalPawns = scoreType === 'mate'
         ? (displayScore > 0 ? 10 : -10)
         : score / 100;
-      const pct = Math.round(whiteWinPct);
       dom.evalBar.setAttribute('aria-valuenow', String(Math.max(-10, Math.min(10, evalPawns))));
       dom.evalBar.setAttribute('aria-valuetext', `${scoreStr} for ${isWhite ? 'White' : 'Black'}`);
-      if (dom.evalSection) dom.evalSection.style.setProperty('--eval-pct', String(pct));
     }
-    if (dom.evalStaleBadge) dom.evalStaleBadge.style.display = isStale ? 'inline-flex' : 'none';
+    if (dom.evalStaleBadge) dom.evalStaleBadge.hidden = !isStale;
     if (dom.evalSection) {
       const lean = scoreType === 'mate'
         ? (displayScore > 0 ? 'you' : 'opp')
@@ -1244,7 +1267,7 @@
       dom.evalSpark.replaceChildren();
       return;
     }
-    const W = 120, H = 28, MID = H / 2;
+    const W = 300, H = 34, MID = H / 2;
     const clampPawns = (cp) => Math.max(-600, Math.min(600, cp)) / 100;
     const values = points.map((p) => (p.scoreType === 'mate' ? Math.sign(p.score || 1) * 6 : clampPawns(p.score)));
     const min = Math.min(...values), max = Math.max(...values);
@@ -1253,24 +1276,23 @@
     const y = (v) => MID - ((v - min) / span - 0.5) * (H - 8);
     const d = values.map((v, i) => `${i === 0 ? 'M' : 'L'}${(i * step).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
     const lastX = ((points.length - 1) * step).toFixed(1);
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-    svg.setAttribute('preserveAspectRatio', 'none');
-    const zero = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    const NS = 'http://www.w3.org/2000/svg';
+    const zero = document.createElementNS(NS, 'line');
     zero.setAttribute('class', 'spark-zero');
     zero.setAttribute('x1', '0'); zero.setAttribute('x2', String(W));
     zero.setAttribute('y1', String(MID)); zero.setAttribute('y2', String(MID));
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const line = document.createElementNS(NS, 'path');
     line.setAttribute('class', 'spark-line');
     line.setAttribute('d', d);
-    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    const dot = document.createElementNS(NS, 'circle');
     dot.setAttribute('class', 'spark-dot');
     dot.setAttribute('cx', lastX);
     dot.setAttribute('cy', y(values[values.length - 1]).toFixed(1));
     dot.setAttribute('r', '2.5');
-    svg.append(zero, line, dot);
-    dom.evalSpark.replaceChildren(svg);
+    dom.evalSpark.replaceChildren(zero, line, dot);
+    // Spark takes the color of the last evaluation's leading side.
     dom.evalSpark.classList.add('is-live');
+    dom.evalSpark.classList.toggle('neg-last', values[values.length - 1] < 0);
   }
 
   // ─── Eval Description ──────────────────────────────────────────────
@@ -1490,9 +1512,9 @@
     const lockup = parseMoveLockup(hints.bestMoveFromTo);
     if (dom.hintText) {
       if (lockup) {
-        dom.hintText.textContent = '';
-        dom.hintText.classList.remove('fade-in');
+        dom.hintText.hidden = true;
       } else {
+        dom.hintText.hidden = false;
         dom.hintText.textContent = hints.main;
         dom.hintText.classList.add('fade-in');
         setTimeout(() => dom.hintText.classList.remove('fade-in'), 300);
@@ -1514,11 +1536,10 @@
 
     if (dom.hintFromTo) {
       if (lockup) {
-        dom.hintFromTo.style.display = '';
-        renderMoveLockup(lockup, data.fen);
+        dom.hintFromTo.hidden = false;
+        renderMoveLockup(lockup, data.fen, hints.main);
       } else {
-        dom.hintFromTo.style.display = 'none';
-        dom.hintFromTo.replaceChildren();
+        dom.hintFromTo.hidden = true;
       }
     }
     const bestUci = data.pvs && data.pvs[0] && data.pvs[0].pv ? data.pvs[0].pv[0] : null;
@@ -1535,28 +1556,22 @@
     return { side: match[1].toLowerCase(), from: match[2], to: match[3] };
   }
 
-  function renderMoveLockup(lockup, fen) {
+  function renderMoveLockup(lockup, fen, san) {
     if (!dom.hintFromTo || !lockup) return;
     const pieceChar = pieceAtSquare(fen, lockup.from);
     const glyph = pieceChar ? (PIECE_GLYPHS[pieceChar.toLowerCase()] || '♟') : '♟';
     const isWhitePiece = pieceChar ? pieceChar === pieceChar.toUpperCase() : lockup.side === 'white';
-    dom.hintFromTo.replaceChildren();
-    const piece = document.createElement('span');
-    piece.className = `sq-piece ${isWhitePiece ? 'is-white' : 'is-black'}`;
-    piece.setAttribute('aria-hidden', 'true');
-    piece.textContent = glyph;
-    const fromSq = document.createElement('span');
-    fromSq.className = 'sq';
-    fromSq.textContent = lockup.from;
-    const arrow = document.createElement('span');
-    arrow.className = 'sq-arrow';
-    arrow.setAttribute('aria-hidden', 'true');
-    arrow.textContent = '→';
-    const toSq = document.createElement('span');
-    toSq.className = 'sq';
-    toSq.textContent = lockup.to;
-    dom.hintFromTo.append(piece, fromSq, arrow, toSq);
+    if (dom.lockupPiece) {
+      // Piece stays physical: warm ivory / near-black, never semantic (§2.3).
+      dom.lockupPiece.textContent = glyph;
+      dom.lockupPiece.className = `piece-chip ${isWhitePiece ? 'pw' : 'pb'}`;
+    }
+    if (dom.lockupSan) dom.lockupSan.textContent = san || '';
+    if (dom.heroPath) dom.heroPath.textContent = `${lockup.from} → ${lockup.to}`;
     dom.hintFromTo.setAttribute('aria-label', `Move ${lockup.from} to ${lockup.to}`);
+    dom.hintFromTo.classList.remove('swap');
+    void dom.hintFromTo.offsetLeft;
+    dom.hintFromTo.classList.add('swap');
   }
 
   // ─── Hero Attack Tag + mode washes (§8.2 visual states) ───────────
@@ -1576,10 +1591,9 @@
   }
 
   function updateHeroWash() {
-    if (!dom.hintCard) return;
-    dom.hintCard.classList.toggle('super-ultra-mode',
-      settings.style === 'super_ultra_aggressive' && !settings.humanLikeMode);
-    dom.hintCard.classList.toggle('human-mode', settings.humanLikeMode === true);
+    if (!dom.heroSection) return;
+    dom.heroSection.dataset.mode = settings.humanLikeMode ? 'human'
+      : (settings.style === 'super_ultra_aggressive' ? 'attack' : 'auto');
   }
 
   // ─── Move Classification ───────────────────────────────────────────
@@ -1587,12 +1601,7 @@
     if (!dom.moveClassSection || !dom.moveClassDisplay) return;
     dom.moveClassSection.dataset.verdict = 'none';
     dom.moveClassSection.dataset.state = 'empty';
-    dom.moveClassDisplay.innerHTML = `
-      <div class="verdict__empty">
-        <span class="verdict__empty-icon" aria-hidden="true"></span>
-        <p class="verdict__empty-text">Play a move to see how it rated</p>
-      </div>
-    `;
+    dom.moveClassDisplay.innerHTML = '<div class="verdict__empty">No classified move yet — play on.</div>';
   }
 
   function renderMoveClassification(evalBefore, evalAfter, opts) {
@@ -1620,10 +1629,11 @@
       : '';
     dom.moveClassDisplay.innerHTML = `
       <div class="verdict__copy">
-        <p class="verdict__mover">${h(moverText)}</p>
-        <p class="verdict__label">${h(cls.label)}${symbol}</p>
-        <p class="verdict__metric">${h(swing)}</p>
-      </div>
+        <div>
+          <p class="verdict__mover">${h(moverText)}</p>
+          <p class="verdict__label">${h(cls.label)}${symbol}</p>
+          <p class="verdict__metric">${h(swing)}</p>
+        </div>
       <div class="verdict__ring" style="--acc: ${acc}" role="img"
            title="Engine accuracy estimate for this move (${acc}/100)"
            aria-label="Engine accuracy estimate ${acc} of 100">
@@ -1850,6 +1860,17 @@
     initSegmentedControls();
     initScrollElevation();
     bindEventHandlers();
+    // Scheme follows the OS; §3 tokens flip via html[data-scheme].
+    if (typeof window.matchMedia === 'function') {
+      const schemeMedia = window.matchMedia('(prefers-color-scheme: dark)');
+      const applyScheme = () => {
+        document.documentElement.dataset.scheme = schemeMedia.matches ? 'dark' : 'light';
+      };
+      applyScheme();
+      if (typeof schemeMedia.addEventListener === 'function') {
+        schemeMedia.addEventListener('change', applyScheme);
+      }
+    }
     stampVersion();
     setBalanceEmptyState();
     renderMoveClassificationEmpty();
