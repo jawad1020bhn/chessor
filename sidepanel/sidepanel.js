@@ -755,6 +755,27 @@
     dom.playerSelector.dataset.selected = assistedPlayerColor || 'w';
   }
 
+  function selectPlayerColor(color) {
+    if (color !== 'w' && color !== 'b') return;
+    if (assistedPlayerColor === color) return;
+    assistedPlayerColor = color;
+    updatePlayerSelectorUI();
+    saveSettings();
+    // Eval history was ingested relative to the old side — reset it so the
+    // sparkline and swing math re-anchor to the newly coached color.
+    evalHistory = [];
+    prevEval = null;
+    prevScoreType = 'cp';
+    updatePositionContext();
+    if (lastAnalysis) {
+      renderAnalysis(lastAnalysis);   // repaint immediately, new perspective
+    } else {
+      setBalanceEmptyState();
+    }
+    if (currentFen) requestAnalysis(true); // pull a fresh read for this side
+    showToast(color === 'w' ? 'Coaching White' : 'Coaching Black', 'info', 1500);
+  }
+
   // ─── Settings Sheets ──────────────────────────────────────────────
   let settingsSheetCloseTimer = null;
 

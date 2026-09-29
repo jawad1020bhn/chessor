@@ -169,4 +169,16 @@ for (const label of labels) {
   assert.ok(new RegExp(`data-verdict="${label}"`).test(css), `CSS styles data-verdict="${label}"`);
 }
 
+// ── 11. No dangling handler targets ──
+// Regression: the player-switch handlers called selectPlayerColor() before
+// it existed — the click threw a ReferenceError and the side never flipped.
+// Every function the wiring references must be declared in the controller.
+const declared = new Set([...js.matchAll(/\bfunction\s+([A-Za-z_$][\w$]*)\s*\(/g)].map((m) => m[1]));
+for (const name of ['selectPlayerColor', 'updatePlayerSelectorUI', 'updatePositionContext',
+  'renderAnalysis', 'setBalanceEmptyState', 'requestAnalysis']) {
+  if (new RegExp(`\\b${name}\\s*\\(`).test(js)) {
+    assert.ok(declared.has(name), `${name} is declared in sidepanel.js, not just called`);
+  }
+}
+
 console.log('panel wiring OK — Flux tiles, rails and controls are fully wired (HTML ⇄ CSS ⇄ JS)');
