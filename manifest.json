@@ -2,48 +2,30 @@
   "manifest_version": 3,
   "name": "Chess Hint Assistant",
   "short_name": "Chess Coach",
-  "version": "13.0.0",
-  "version_name": "13.0.0 (Chessor — Study desk)",
+  "version": "14.0.0",
+  "version_name": "14.0.0 (Felt → Flux)",
   "author": "jawad1020bhn",
   "minimum_chrome_version": "114",
   "description": "Cloud chess analysis workspace with verified-position handling, Ultra Super Aggressive Attack style ranking, multi-source analysis, opening explorer, and tablebases.",
-  "permissions": [
-    "sidePanel",
-    "activeTab",
-    "storage",
-    "scripting",
-    "alarms"
-  ],
+  "permissions": ["sidePanel", "activeTab", "storage", "scripting", "alarms"],
   "host_permissions": [
-    "https://www.chess.com/*",
-    "https://chess.com/*",
-    "https://lichess.org/*",
-    "https://lichess.org/api/*",
-    "https://explorer.lichess.ovh/*",
-    "https://tablebase.lichess.ovh/*",
-    "https://chess-api.com/*",
-    "https://www.chessagine.com/*"
+    "https://www.chess.com/",
+    "https://chess.com/",
+    "https://lichess.org/",
+    "https://lichess.org/api/",
+    "https://explorer.lichess.ovh/",
+    "https://tablebase.lichess.ovh/",
+    "https://chess-api.com/",
+    "https://www.chessagine.com/"
   ],
-  "background": {
-    "service_worker": "background.js"
-  },
-  "side_panel": {
-    "default_path": "sidepanel/sidepanel.html"
-  },
+  "background": { "service_worker": "background.js" },
+  "side_panel": { "default_path": "sidepanel/sidepanel.html" },
   "action": {
     "default_title": "Open Chess Hint Assistant",
-    "default_icon": {
-      "16": "icons/icon-16.png",
-      "48": "icons/icon-48.png",
-      "128": "icons/icon-128.png"
-    }
+    "default_icon": { "16": "icons/icon-16.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" }
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; connect-src https://lichess.org https://explorer.lichess.ovh https://tablebase.lichess.ovh https://chess-api.com https://www.chessagine.com;"
   },
-  "icons": {
-    "16": "icons/icon-16.png",
-    "48": "icons/icon-48.png",
-    "128": "icons/icon-128.png"
-  }
+  "icons": { "16": "icons/icon-16.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" }
 }

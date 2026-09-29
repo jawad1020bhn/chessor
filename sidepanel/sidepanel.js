@@ -1,14 +1,7 @@
 /**
- * Chess Hint Assistant — Side Panel Controller
- * Turn-Based Analysis Engine with cloud providers and a local fallback.
- *
+ * Chess Coach — Side Panel Controller v14 "Flux"
+ * Material 3 Expressive design system, turn-based analysis, cloud + human-like.
  * EDUCATIONAL USE ONLY — FAIR-PLAY SAFE
- * This project is a study/research tool for building a chess engine that can
- * play in a variety of styles (normal, aggressive, ultra-aggressive). It is
- * intended for learning, offline analysis, and engine-variation research. It
- * is anti-cheat compliant and fair-play safe: it never assists a player in a
- * rated or live online game, and it must not be used to gain an unfair
- * advantage against human opponents.
  */
 
 (function () {
@@ -18,11 +11,11 @@
   let currentFen = null;
   let lastPositionFen = null;
   let lastAnalyzedFen = null;
-  let playerColor = null;          // Auto-detected from board orientation
-  let assistedPlayerColor = null;  // User-selected: which player to assist (null = not yet set)
-  let activeTabId = 'active';       // Included in position-generation tokens
-  let positionReliable = false;     // True only when the site supplied a complete FEN
-  let turnReliable = false;         // True only when the site supplied an active color
+  let playerColor = null;
+  let assistedPlayerColor = null;
+  let activeTabId = 'active';
+  let positionReliable = false;
+  let turnReliable = false;
   const EXACT_HINT_LEVEL = 5;
   let lastAnalysis = null;
   let prevEval = null;
@@ -34,26 +27,21 @@
   let humanPlanState = null;
 
   const normalizeStyle = (style) => {
-    if (style === 'normal' || style === 'aggressive' || style === 'super_ultra_aggressive') return style;
-    return ['super_aggressive', 'ultra_aggressive_stealth', 'kamikaze', 'berserker'].includes(style)
-      ? 'super_ultra_aggressive'
-      : 'normal';
+    if (['normal', 'aggressive', 'super_ultra_aggressive'].includes(style)) return style;
+    return ['super_aggressive', 'ultra_aggressive_steam', 'kamikaze', 'berserker'].includes(style)
+      ? 'super_ultra_aggressive' : 'normal';
   };
 
   let settings = {
     analysisQuality: 'auto',
     candidateLines: 'auto',
     style: 'normal',
-    // Kept as a style-scoped preference. The engine activates it only when
-    // style === 'super_ultra_aggressive'; other styles ignore it completely.
     earlyKingHuntEnabled: false,
     humanLikeMode: false,
     sparringStrength: 1100,
     autoAnalyze: true,
     showThreats: true,
     showCriticalMoments: true,
-    // Still gate background fetching that feeds the coach tab (opening name,
-    // tablebase-backed winning plans); the explore UI is gone.
     showOpeningExplorer: true,
     showTablebase: true,
     useChessApi: true,
@@ -80,13 +68,13 @@
   }
 
   const STYLE_DESCRIPTIONS = {
-    normal: 'Objective best play, reliable conversion, and solid defense. This is the engine\'s strongest recommendation with no style bias.',
-    aggressive: 'Win as fast as possible through sound, forcing play. Push the initiative and keep pressure on the enemy king without throwing material away.',
-    super_ultra_aggressive: 'Fearless, organized attack: build up soundly, then break through with checks, pawn storms, forks, pins and bold sacrifices to finish fast against <=1100 opponents.'
+    normal: 'Objective best play, reliable conversion, and solid defense.',
+    aggressive: 'Win as fast as possible through sound, forcing play.',
+    super_ultra_aggressive: 'Fearless, organized attack: build up soundly, then break through with checks, pawn storms, forks, pins and bold sacrifices to finish fast.'
   };
 
   function updateStyleDescription() {
-    const el = $('#style-description');
+    const el = document.getElementById('style-description');
     if (!el) return;
     el.textContent = STYLE_DESCRIPTIONS[settings.style] || STYLE_DESCRIPTIONS.normal;
   }
@@ -95,73 +83,18 @@
     return settings.style === 'super_ultra_aggressive' && settings.earlyKingHuntEnabled === true;
   }
 
-  // The preference is preserved when the user changes style, but the control
-  // is unavailable outside Ultra Super Aggressive and the engine receives a
-  // true flag only through the exact style-scoped predicate above.
   function updateEarlyKingHuntUI() {
-    const container = $('#early-king-hunt-setting');
-    const checkbox = $('#setting-early-king-hunt');
+    const container = document.getElementById('early-king-hunt-setting');
+    const checkbox = document.getElementById('setting-early-king-hunt');
     if (!container || !checkbox) return;
-    const styleAllowsSetting = settings.style === 'super_ultra_aggressive';
-    container.hidden = !styleAllowsSetting;
-    container.setAttribute('aria-hidden', styleAllowsSetting ? 'false' : 'true');
-    checkbox.disabled = !styleAllowsSetting;
+    const styleAllows = settings.style === 'super_ultra_aggressive';
+    container.hidden = !styleAllows;
+    container.setAttribute('aria-hidden', styleAllows ? 'false' : 'true');
+    checkbox.disabled = !styleAllows;
     checkbox.checked = settings.earlyKingHuntEnabled === true;
   }
 
-  function isMaiaOnlyActive() {
-    return settings.maiaOnlyMode === true;
-  }
-
-  function updateEngineGroups() {
-    const toggles = {
-      'chess-api': 'setting-use-chess-api',
-      'lichess-cloud': 'setting-use-lichess-cloud',
-      'maia3': 'setting-use-maia3',
-      'masters-explorer': 'setting-use-masters-explorer'
-    };
-    $$('.md-engine[data-engine]').forEach(group => {
-      if (group.dataset.engine === 'engine-style') {
-        const chessApi = $(`#setting-use-chess-api`);
-        const lichess = $(`#setting-use-lichess-cloud`);
-        const bothOff = (chessApi ? chessApi.checked !== true : false)
-          && (lichess ? lichess.checked !== true : false);
-        group.classList.toggle('md-engine--off', bothOff);
-        return;
-      }
-      const toggle = $(`#${toggles[group.dataset.engine]}`);
-      group.classList.toggle('md-engine--off', toggle ? toggle.checked !== true : false);
-    });
-  }
-
-  function updateMaiaOnlyUI() {
-    const maiaOnly = isMaiaOnlyActive();
-    const block = $('#maia-settings-block');
-    if (block) {
-      block.hidden = !maiaOnly;
-      block.setAttribute('aria-hidden', maiaOnly ? 'false' : 'true');
-    }
-    $$('.md-engine[data-engine]').forEach(group => {
-      if (group.dataset.engine !== 'maia3') group.classList.toggle('md-engine--inactive', maiaOnly);
-    });
-    const gated = ['setting-style', 'setting-human-like-mode', 'setting-sparring-strength',
-      'setting-analysis-quality', 'setting-candidate-lines',
-      'setting-use-chess-api', 'setting-use-lichess-cloud', 'setting-use-masters-explorer'];
-    for (const id of gated) {
-      const el = $(`#${id}`);
-      if (el) el.disabled = maiaOnly;
-    }
-    $$('.md-choice-stack .md-choice').forEach(btn => {
-      if (maiaOnly) btn.setAttribute('aria-disabled', 'true');
-      else btn.removeAttribute('aria-disabled');
-    });
-    $$('.human-mode-opt').forEach(btn => {
-      if (maiaOnly) btn.setAttribute('aria-disabled', 'true');
-      else btn.removeAttribute('aria-disabled');
-    });
-  }
-
-  // ─── DOM References ─────────────────────────────────────────────────
+  // ─── Dom Refs & Helpers ───────────────────────────────────────────
   const $ = (sel) => document.querySelector(sel);
   const $$ = (sel) => document.querySelectorAll(sel);
   const h = (value) => ChessCore.escapeHtml(value);
@@ -173,11 +106,11 @@
     statusText: $('.status-text'),
     positionContext: $('#position-context'),
     positionTurn: $('#position-turn'),
-    evalBarWhite: $('#eval-bar-white'),
+    evalBarFill: $('#eval-bar-white'),
     evalBar: $('#eval-bar'),
     evalSection: $('#eval-section'),
-    evalBarWhitePct: $('#eval-bar-white-pct'),
-    evalBarBlackPct: $('#eval-bar-black-pct'),
+    evalPctLeft: $('#eval-bar-white-pct'),
+    evalPctRight: $('#eval-bar-black-pct'),
     evalStaleBadge: $('#eval-stale-badge'),
     evalWhiteLabel: $('#eval-white-label'),
     evalBlackLabel: $('#eval-black-label'),
@@ -191,21 +124,20 @@
     hintFromTo: $('#hint-fromto'),
     hintAttackTag: $('#hint-attack-tag'),
     heroWelcome: $('#hero-welcome'),
+    hintCard: $('#hint-card'),
     ideaSection: $('#idea-section'),
     ideaList: $('#idea-list'),
-    hintCard: $('#hint-card'),
     altsSection: $('#alts-section'),
     altsList: $('#alts-list'),
     evalSpark: $('#eval-sparkline'),
     moveClassSection: $('#move-class-section'),
     moveClassDisplay: $('#move-class-display'),
-    settingsPanel: $('#settings-panel'),
+    settingsSheet: $('#settings-sheet'),
     btnSettings: $('#btn-settings'),
     btnCloseSettings: $('#btn-close-settings'),
     btnRefresh: $('#btn-refresh'),
     btnHealthCheck: $('#btn-health-check'),
     btnClearCaches: $('#btn-clear-caches'),
-    // Features
     playerSelector: $('#player-selector'),
     criticalMomentSection: $('#critical-moment-section'),
     criticalMomentText: $('#critical-moment-text'),
@@ -213,19 +145,64 @@
     correlationStat: $('#correlation-stat')
   };
 
-  // ─── Turn-Based State ──────────────────────────────────────────────
-  let isPlayerTurn = true;             // Is it currently the assisted player's turn?
-  let waitingForOpponent = false;      // Are we waiting for opponent to move?
-  let turnJustChanged = false;         // Did the turn just change to the player?
+  // ─── Engine Groups ────────────────────────────────────────────────
+  let healthCheckInFlight = false;
 
-  // Track player's actual moves vs engine recommendations.
-  // We remember the FEN at the moment the engine returned its recommendation;
-  // when the side panel later observes a new FEN where it's no longer the player's
-  // turn (i.e. the player just moved), we infer the move and report it to background.
+  function isMaiaOnlyActive() { return settings.maiaOnlyMode === true; }
+
+  function updateEngineGroups() {
+    const toggles = {
+      'chess-api': 'setting-use-chess-api',
+      'lichess-cloud': 'setting-use-lichess-cloud',
+      'maia3': 'setting-use-maia3',
+      'masters-explorer': 'setting-use-masters-explorer'
+    };
+    $$('.engine-group[data-engine]').forEach(group => {
+      if (group.dataset.engine === 'engine-style') {
+        const chessApi = $('#setting-use-chess-api');
+        const lichess = $('#setting-use-lichess-cloud');
+        const bothOff = (chessApi ? !chessApi.checked : false) && (lichess ? !lichess.checked : false);
+        group.classList.toggle('engine-group--off', bothOff);
+        return;
+      }
+      const toggle = $(`#${toggles[group.dataset.engine]}`);
+      group.classList.toggle('engine-group--off', toggle ? !toggle.checked : false);
+    });
+  }
+
+  function updateMaiaOnlyUI() {
+    const maiaOnly = isMaiaOnlyActive();
+    const block = $('#maia-settings-block');
+    if (block) {
+      block.hidden = !maiaOnly;
+      block.setAttribute('aria-hidden', maiaOnly ? 'false' : 'true');
+    }
+    $$('.engine-group[data-engine]').forEach(group => {
+      if (group.dataset.engine !== 'maia3') group.classList.toggle('engine-group--inactive', maiaOnly);
+    });
+    const gated = ['setting-style', 'setting-human-like-mode', 'setting-sparring-strength',
+      'setting-analysis-quality', 'setting-candidate-lines',
+      'setting-use-chess-api', 'setting-use-lichess-cloud', 'setting-use-masters-explorer'];
+    for (const id of gated) {
+      const el = $(`#${id}`);
+      if (el) el.disabled = maiaOnly;
+    }
+    $$('.choice-stack .choice').forEach(btn => {
+      btn.setAttribute('aria-disabled', maiaOnly ? 'true' : 'false');
+    });
+    $$('.human-mode-opt').forEach(btn => {
+      btn.setAttribute('aria-disabled', maiaOnly ? 'true' : 'false');
+    });
+  }
+
+  // ─── Turn-Based State ──────────────────────────────────────────────
+  let isPlayerTurn = true;
+  let waitingForOpponent = false;
+  let turnJustChanged = false;
   let lastEngineRecommendationFen = null;
   let lastEngineRecommendationUci = null;
 
-  // ─── Board Reading with Jitter ───────────────────────────────────
+  // ─── Board Reading ────────────────────────────────────────────────
   let boardReadTimer = null;
   const READ_INTERVAL_MIN = 2000;
   const READ_INTERVAL_MAX = 5000;
@@ -235,14 +212,9 @@
     readBoardFromBackground();
     scheduleNextRead();
   }
-
   function stopBoardReading() {
-    if (boardReadTimer) {
-      clearTimeout(boardReadTimer);
-      boardReadTimer = null;
-    }
+    if (boardReadTimer) { clearTimeout(boardReadTimer); boardReadTimer = null; }
   }
-
   function scheduleNextRead() {
     const delay = READ_INTERVAL_MIN + Math.random() * (READ_INTERVAL_MAX - READ_INTERVAL_MIN);
     boardReadTimer = setTimeout(async () => {
@@ -250,7 +222,6 @@
       scheduleNextRead();
     }, delay);
   }
-
   async function readBoardFromBackground() {
     try {
       const result = await chrome.runtime.sendMessage({ type: 'read_board' });
@@ -269,27 +240,20 @@
     } catch (e) {}
   }
 
-  // ═══════════════════════════════════════════════════════════════════════
-  // ─── Toast Notification System ────────────────────────────────────────
-  // ═══════════════════════════════════════════════════════════════════════
+  // ─── Toast System ─────────────────────────────────────────────────
   const TOAST_DURATION = 3500;
   const TOAST_MAX = 3;
-  let toastCount = 0;
 
   function showToast(message, type = 'info', duration = TOAST_DURATION) {
     const container = document.getElementById('toast-container');
     if (!container) return;
-
-    // Limit toasts
     while (container.children.length >= TOAST_MAX) {
       const oldest = container.firstElementChild;
       if (oldest) oldest.remove();
     }
-
     const safeType = Object.hasOwn({ success: 1, error: 1, warning: 1, info: 1 }, type) ? type : 'info';
     const toast = document.createElement('div');
     toast.className = `toast toast-${safeType}`;
-    // The icon is a Material-symbol mask rendered by CSS — no text glyphs.
     const icon = document.createElement('span');
     icon.className = 'toast-icon';
     icon.setAttribute('aria-hidden', 'true');
@@ -299,7 +263,6 @@
     toast.append(icon, messageElement);
     container.appendChild(toast);
     attachSwipeDismiss(toast);
-
     setTimeout(() => {
       if (!toast.isConnected) return;
       toast.classList.add('toast-exit');
@@ -307,8 +270,6 @@
     }, duration);
   }
 
-  // Drag a toast sideways past ~56px and it flings away instead of waiting
-  // out its timer. Below the threshold it springs back home.
   function attachSwipeDismiss(toast) {
     let startX = null;
     let dx = 0;
@@ -340,51 +301,35 @@
     toast.addEventListener('pointercancel', settle);
   }
 
-  // ═══════════════════════════════════════════════════════════════════════
-  // ─── Keyboard Shortcuts ──────────────────────────────────────────────
-  // ═══════════════════════════════════════════════════════════════════════
+  // ─── Keyboard Shortcuts ──────────────────────────────────────────
   let shortcutHelpVisible = false;
   const shortcutDialog = document.getElementById('shortcut-help');
   const REDUCED_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  let shortcutReturnFocus = null;
   function openShortcuts() {
     if (!shortcutDialog) return;
-    shortcutReturnFocus = document.activeElement;
-    document.getElementById('app').inert = true;
     shortcutHelpVisible = true;
-    shortcutDialog.classList.remove('md-dialog--closing');
-    shortcutDialog.style.display = 'block';
+    shortcutDialog.classList.remove('dialog--closing');
+    shortcutDialog.hidden = false;
     const closeBtn = document.getElementById('btn-close-shortcut-help');
     if (closeBtn) closeBtn.focus();
   }
 
   function closeShortcuts() {
-    if (!shortcutDialog || shortcutDialog.style.display === 'none') return;
+    if (!shortcutDialog || shortcutDialog.hidden) return;
     shortcutHelpVisible = false;
-    shortcutDialog.classList.add('md-dialog--closing');
+    shortcutDialog.classList.add('dialog--closing');
     setTimeout(() => {
-      shortcutDialog.style.display = 'none';
-      shortcutDialog.classList.remove('md-dialog--closing');
-      document.getElementById('app').inert = false;
-      if (shortcutReturnFocus?.isConnected) shortcutReturnFocus.focus();
+      shortcutDialog.hidden = true;
+      shortcutDialog.classList.remove('dialog--closing');
+      if (dom.btnSettings) dom.btnSettings.focus();
     }, REDUCED_MOTION ? 0 : 200);
   }
 
   function initKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
-      // Escape must work even while a switch or range has focus.
-      if (e.key === 'Escape') {
-        if (shortcutHelpVisible) closeShortcuts();
-        else if (dom.settingsPanel?.style.display !== 'none') closeSettingsSheet();
-        return;
-      }
-      if (e.ctrlKey || e.metaKey || e.altKey || e.target.isContentEditable) return;
-      // Don't intercept if user is in an input/select field
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
-
       const key = e.key.toLowerCase();
-
       switch (key) {
         case 'r':
           e.preventDefault();
@@ -392,36 +337,27 @@
           break;
         case 's':
           e.preventDefault();
-          if (dom.settingsPanel && dom.settingsPanel.classList.contains('md-sheet--closing')) {
-            openSettingsSheet();   // cancel the closing motion, come straight back
-          } else if (dom.settingsPanel && dom.settingsPanel.style.display !== 'none') {
+          if (dom.settingsSheet && dom.settingsSheet.classList.contains('sheet--closing')) {
+            openSettingsSheet();
+          } else if (dom.settingsSheet && !dom.settingsSheet.hidden) {
             closeSettingsSheet();
           } else {
             openSettingsSheet();
           }
           break;
         case 'escape':
-          if (shortcutHelpVisible) {
-            closeShortcuts();
-          } else if (dom.settingsPanel && dom.settingsPanel.style.display !== 'none') {
-            closeSettingsSheet();
-          }
+          if (shortcutHelpVisible) { closeShortcuts(); }
+          else if (dom.settingsSheet && !dom.settingsSheet.hidden) { closeSettingsSheet(); }
           break;
         case '?':
           e.preventDefault();
-          if (shortcutHelpVisible) {
-            closeShortcuts();
-          } else {
-            openShortcuts();
-          }
-          break;
-        default:
+          if (shortcutHelpVisible) closeShortcuts();
+          else openShortcuts();
           break;
       }
     });
   }
 
-  // The shortcut dialog is modal: Tab cycles inside it until it closes.
   function initDialogFocusTrap() {
     if (!shortcutDialog) return;
     const FOCUSABLE = 'button, [href], [tabindex]:not([tabindex="-1"])';
@@ -433,22 +369,43 @@
       const first = focusables[0];
       const last = focusables[focusables.length - 1];
       if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
+        e.preventDefault(); last.focus();
       } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
+        e.preventDefault(); first.focus();
       }
     });
   }
 
-  function finishRefresh() {
-    if (refreshSafetyTimer) clearTimeout(refreshSafetyTimer);
-    refreshSafetyTimer = null;
-    if (dom.btnRefresh) dom.btnRefresh.classList.remove('spinning');
-    isRefreshing = false;
+  function initSettingsFocusTrap() {
+    if (!dom.settingsSheet) return;
+    const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+    const getFocusable = () => Array.from(dom.settingsSheet.querySelectorAll(FOCUSABLE))
+      .filter(el => el.offsetParent !== null && !el.disabled);
+    dom.settingsSheet.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab') return;
+      const focusable = getFocusable();
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus();
+      }
+    });
+    const observer = new MutationObserver(() => {
+      const isVisible = !dom.settingsSheet.hidden;
+      if (isVisible) {
+        const focusable = getFocusable();
+        if (focusable.length > 0 && !dom.settingsSheet.contains(document.activeElement)) {
+          focusable[0].focus();
+        }
+      }
+    });
+    observer.observe(dom.settingsSheet, { attributes: true, attributeFilter: ['style'] });
   }
 
+  // ─── Move Inference ────────────────────────────────────────────────
   function inferMoveSan(prevFen, currFen) {
     if (!prevFen || !currFen || !window.ChessCore || typeof window.ChessCore.inferTransition !== 'function') return null;
     const t = window.ChessCore.inferTransition(prevFen, currFen);
@@ -468,30 +425,26 @@
     return uci;
   }
 
+  // ─── Balance States ────────────────────────────────────────────────
   function setBalanceLoadingState(hasPrevScore = false) {
-    if (dom.evalSection) {
-      dom.evalSection.dataset.state = 'loading';
-    }
+    if (dom.evalSection) dom.evalSection.dataset.state = 'loading';
     if (dom.evalStaleBadge) dom.evalStaleBadge.style.display = 'none';
     if (!hasPrevScore) {
-      // First analysis of the position: shimmer placeholders instead of
-      // static dashes so the loading state feels alive, not broken.
       renderBalanceSkeleton();
     } else if (dom.evalDescription) {
       dom.evalDescription.textContent = 'Analyzing position…';
     }
   }
 
-  // Skeleton shimmer reads the tile's role color via currentColor.
   function renderBalanceSkeleton() {
     if (dom.evalDescription) {
-      dom.evalDescription.innerHTML = '<span class="md-skeleton" style="width:58%">&#8203;</span>';
+      dom.evalDescription.innerHTML = '<span class="skeleton" style="width:58%">&#8203;</span>';
     }
     if (dom.evalWhiteLabel) {
-      dom.evalWhiteLabel.innerHTML = '<span class="md-skeleton" style="width:3.5ch">&#8203;</span>';
+      dom.evalWhiteLabel.innerHTML = '<span class="skeleton" style="width:3.5ch">&#8203;</span>';
     }
     if (dom.evalBlackLabel) {
-      dom.evalBlackLabel.innerHTML = '<span class="md-skeleton" style="width:3.5ch">&#8203;</span>';
+      dom.evalBlackLabel.innerHTML = '<span class="skeleton" style="width:3.5ch">&#8203;</span>';
     }
   }
 
@@ -505,7 +458,7 @@
     if (dom.evalStaleBadge) dom.evalStaleBadge.style.display = 'none';
     if (dom.evalWhiteLabel) dom.evalWhiteLabel.textContent = '—';
     if (dom.evalBlackLabel) dom.evalBlackLabel.textContent = '—';
-    if (dom.evalBarWhite) dom.evalBarWhite.style.transform = 'scaleX(0.5)';
+    if (dom.evalBarFill) dom.evalBarFill.style.transform = 'scaleX(0.5)';
     renderEvalSparkline();
   }
 
@@ -519,98 +472,11 @@
     if (dom.evalStaleBadge) dom.evalStaleBadge.style.display = 'none';
     if (dom.evalWhiteLabel) dom.evalWhiteLabel.textContent = '—';
     if (dom.evalBlackLabel) dom.evalBlackLabel.textContent = '—';
-    if (dom.evalBarWhite) dom.evalBarWhite.style.transform = 'scaleX(0.5)';
+    if (dom.evalBarFill) dom.evalBarFill.style.transform = 'scaleX(0.5)';
     renderEvalSparkline();
   }
 
-  // ─── Initialize ────────────────────────────────────────────────────
-  function init() {
-    loadSettings();
-    applySettingsToUI();
-    bindEvents();
-    initMdSliders();
-    initSegmentedControls();
-    initKeyboardShortcuts();
-    initSettingsFocusTrap();
-    initDialogFocusTrap();
-    chrome.runtime.sendMessage({ type: 'panel_state', open: true }).catch(() => {});
-    window.addEventListener('pagehide', () => {
-      chrome.runtime.sendMessage({ type: 'panel_state', open: false, tabId: activeTabId }).catch(() => {});
-    }, { once: true });
-    startBoardReading();
-    syncWelcome();
-    setBalanceEmptyState();
-    renderMoveClassificationEmpty();
-    initScrollElevation();
-    initVersionStamp();
-    updateEngineStatus('connecting', 'Looking for a board…');
-    updateCorrelationStat();   // initialise "0 / 0 (0%)" display
-    runHealthCheck();          // passive status only; does not call providers
-  }
-
-  // ─── Scroll-aware app bar elevation ─────────────────────────────────
-  // One rAF-throttled scroll listener flips `.is-scrolled` on the app shell;
-  // the CSS carries the whole visual response.
-  function initScrollElevation() {
-    const canvas = document.querySelector('.md-canvas');
-    const app = document.getElementById('app');
-    if (!canvas || !app) return;
-    let ticking = false;
-    const update = () => {
-      ticking = false;
-      app.classList.toggle('is-scrolled', canvas.scrollTop > 4);
-    };
-    canvas.addEventListener('scroll', () => {
-      if (!ticking) { ticking = true; requestAnimationFrame(update); }
-    }, { passive: true });
-  }
-
-  // ─── Version stamp ──────────────────────────────────────────────────
-  function initVersionStamp() {
-    const el = document.getElementById('app-version-stamp');
-    if (!el) return;
-    const manifest = chrome.runtime && chrome.runtime.getManifest ? chrome.runtime.getManifest() : null;
-    el.textContent = manifest ? `Chessor · v${manifest.version}` : '';
-  }
-
-  // Focus trap for the settings panel so Tab can't escape
-  // to the underlying UI while it's open. Also moves focus into the panel on
-  // open and restores it to the settings button on close.
-  function initSettingsFocusTrap() {
-    if (!dom.settingsPanel) return;
-    const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
-
-    const getFocusable = () => Array.from(dom.settingsPanel.querySelectorAll(FOCUSABLE))
-      .filter(el => el.offsetParent !== null && !el.disabled && el.tabIndex >= 0);
-
-    dom.settingsPanel.addEventListener('keydown', (e) => {
-      if (e.key !== 'Tab') return;
-      const focusable = getFocusable();
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    });
-
-    // When the panel is shown, move focus into it; when hidden, restore.
-    const observer = new MutationObserver(() => {
-      const isVisible = dom.settingsPanel.style.display !== 'none';
-      if (isVisible) {
-        const focusable = getFocusable();
-        if (focusable.length > 0 && !dom.settingsPanel.contains(document.activeElement)) {
-          focusable[0].focus();
-        }
-      }
-    });
-    observer.observe(dom.settingsPanel, { attributes: true, attributeFilter: ['style'] });
-  }
-
+  // ─── Settings Loading & Saving ─────────────────────────────────────
   function loadSettings() {
     chrome.storage.local.get('settings', (result) => {
       if (result.settings) {
@@ -624,8 +490,8 @@
           earlyKingHuntEnabled: migrated.earlyKingHuntEnabled === true,
           maiaOnlyMode: migrated.maiaOnlyMode === true,
           maiaRating: (() => {
-            const rating = Math.round(Number(migrated.maiaRating));
-            return Number.isFinite(rating) ? Math.max(600, Math.min(2600, Math.round(rating / 100) * 100)) : 1500;
+            const r = Math.round(Number(migrated.maiaRating));
+            return Number.isFinite(r) ? Math.max(600, Math.min(2600, Math.round(r / 100) * 100)) : 1500;
           })(),
           analysisQuality: window.AnalysisPolicy
             ? window.AnalysisPolicy.normalizeQuality(migrated.analysisQuality)
@@ -638,7 +504,7 @@
             : (migrated.maiaCandidateLines || 'auto')
         };
         applySettingsToUI();
-        if (settings.style !== result.settings.style) chrome.storage.local.set({ settings });
+        if (settings.style !== migrated.style) chrome.storage.local.set({ settings });
         if (lastAnalysis) renderAnalysis(lastAnalysis);
       }
     });
@@ -647,38 +513,6 @@
         assistedPlayerColor = result.assistedPlayerColor;
         updatePlayerSelectorUI();
       }
-    });
-  }
-
-  // ─── M3E slider: custom visuals driven by the native range input ─────
-  function initMdSliders() {
-    $$('[data-md-slider]').forEach((slider) => {
-      const input = slider.querySelector('input[type="range"]');
-      const fill = slider.querySelector('.md-slider__fill');
-      const handle = slider.querySelector('.md-slider__handle');
-      if (!input || !fill || !handle) return;
-
-      const render = () => {
-        const min = Number(input.min) || 0;
-        const max = Number(input.max) || 100;
-        const frac = Math.min(1, Math.max(0, (Number(input.value) - min) / (max - min)));
-        fill.style.width = `${frac * 100}%`;
-        handle.style.left = `${frac * 100}%`;
-      };
-
-      let bumpTimer = null;
-      const bumpChip = () => {
-        const chip = document.getElementById('sparring-strength-value');
-        if (!chip) return;
-        chip.classList.add('is-bumped');
-        clearTimeout(bumpTimer);
-        bumpTimer = setTimeout(() => chip.classList.remove('is-bumped'), 140);
-      };
-
-      input.addEventListener('input', () => { render(); bumpChip(); });
-      input.addEventListener('pointerdown', () => slider.classList.add('is-dragging'));
-      window.addEventListener('pointerup', () => slider.classList.remove('is-dragging'));
-      render();
     });
   }
 
@@ -706,10 +540,10 @@
       'setting-use-masters-explorer': settings.useMastersExplorer,
       'setting-maia-only': settings.maiaOnlyMode,
       'setting-maia-rating': settings.maiaRating,
-      'setting-maia-lines': settings.maiaCandidateLines,
+      'setting-maia-lines': settings.maiaCandidateLines
     };
     Object.entries(mapping).forEach(([id, val]) => {
-      const el = $(`#${id}`);
+      const el = document.getElementById(id);
       if (!el) return;
       if (el.type === 'checkbox') el.checked = val;
       else el.value = val;
@@ -732,22 +566,80 @@
     });
     updateStyleDescription();
     updateEarlyKingHuntUI();
-    syncExpressiveControls();
     syncAllSegments();
   }
 
-  function syncExpressiveControls() {
-    $$('[data-expressive-setting]').forEach((btn) => {
-      const field = $(`#${btn.dataset.expressiveSetting}`);
-      if (!field) return;
-      const selected = String(field.type === 'checkbox' ? field.checked : field.value) === String(btn.dataset.value);
-      btn.classList.toggle('is-selected', selected);
-      btn.setAttribute('aria-checked', selected ? 'true' : 'false');
+  // ─── Sliders ───────────────────────────────────────────────────────
+  function initMdSliders() {
+    $$('[data-md-slider]').forEach((slider) => {
+      const input = slider.querySelector('input[type="range"]');
+      const fill = slider.querySelector('.slider__fill');
+      const handle = slider.querySelector('.slider__handle');
+      if (!input || !fill || !handle) return;
+      const render = () => {
+        const min = Number(input.min) || 0;
+        const max = Number(input.max) || 100;
+        const frac = Math.min(1, Math.max(0, (Number(input.value) - min) / (max - min)));
+        fill.style.width = `${frac * 100}%`;
+        handle.style.left = `${frac * 100}%`;
+      };
+      let bumpTimer = null;
+      const bumpChip = () => {
+        const chip = document.getElementById('sparring-strength-value');
+        if (!chip) return;
+        chip.classList.add('is-bumped');
+        clearTimeout(bumpTimer);
+        bumpTimer = setTimeout(() => chip.classList.remove('is-bumped'), 140);
+      };
+      input.addEventListener('input', () => { render(); bumpChip(); });
+      input.addEventListener('pointerdown', () => slider.classList.add('is-dragging'));
+      window.addEventListener('pointerup', () => slider.classList.remove('is-dragging'));
+      render();
     });
-    $$('.human-mode-opt').forEach((btn) => {
-      const active = (btn.dataset.mode === 'on') === settings.humanLikeMode;
-      btn.classList.toggle('is-selected', active);
+  }
+
+  // ─── Segmented Controls ───────────────────────────────────────────
+  const segmentedGroups = [];
+
+  function layoutSegmented(group) {
+    if (!group) return;
+    const selected = group.querySelector('[aria-checked="true"]');
+    if (!selected) {
+      group.classList.remove('is-ready');
+      return;
+    }
+    if (group.offsetWidth === 0 || selected.offsetWidth === 0) {
+      group.classList.remove('is-ready');
+      return;
+    }
+    group.style.setProperty('--seg-x', `${selected.offsetLeft}px`);
+    group.style.setProperty('--seg-y', `${selected.offsetTop}px`);
+    group.style.setProperty('--seg-w', `${selected.offsetWidth}px`);
+    group.style.setProperty('--seg-h', `${selected.offsetHeight}px`);
+    group.classList.add('is-ready');
+  }
+
+  function syncAllSegments() {
+    segmentedGroups.forEach(layoutSegmented);
+  }
+
+  function initSegmentedControls() {
+    $$('.segmented[role="radiogroup"]').forEach((group) => {
+      if (!group.querySelector('.segmented__indicator')) {
+        const indicator = document.createElement('span');
+        indicator.className = 'segmented__indicator';
+        indicator.setAttribute('aria-hidden', 'true');
+        group.prepend(indicator);
+      }
+      segmentedGroups.push(group);
+      if (typeof ResizeObserver === 'function') {
+        new ResizeObserver(() => layoutSegmented(group)).observe(group);
+      }
     });
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => syncAllSegments()).catch(() => {});
+    }
+    requestAnimationFrame(syncAllSegments);
   }
 
   // ─── Player Selector ──────────────────────────────────────────────
@@ -758,216 +650,34 @@
       btn.classList.toggle('active', selected);
       btn.setAttribute('aria-checked', selected ? 'true' : 'false');
     });
-    // Preserve the selected side as a semantic state hook.
     dom.playerSelector.dataset.selected = assistedPlayerColor || 'w';
-    layoutSegmented(dom.playerSelector);
   }
 
-  // Native-feeling radio groups: one tab stop, arrows select within the group.
-  // No indicator measurements or ResizeObservers; selection is pure CSS.
-  function layoutSegmented(group) {
-    if (!group) return;
-    const items = Array.from(group.querySelectorAll('[role="radio"]')).filter(el => !el.disabled);
-    const selected = items.find(el => el.getAttribute('aria-checked') === 'true') || items[0];
-    items.forEach(el => { el.tabIndex = el === selected ? 0 : -1; });
+  // ─── Settings Sheets ──────────────────────────────────────────────
+  let settingsSheetCloseTimer = null;
+
+  function openSettingsSheet() {
+    if (!dom.settingsSheet) return;
+    if (settingsSheetCloseTimer) clearTimeout(settingsSheetCloseTimer);
+    dom.settingsSheet.classList.remove('sheet--closing');
+    dom.settingsSheet.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(syncAllSegments));
+    runHealthCheck();
   }
 
-  function syncAllSegments() {
-    $$('[role="radiogroup"]').forEach(layoutSegmented);
-  }
-
-  function initSegmentedControls() {
-    syncAllSegments();
-  }
-
-  // ─── Event Binding ─────────────────────────────────────────────────
-  function bindEvents() {
-    // Player selector buttons
-    $$('.player-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const newColor = btn.dataset.color;
-        if (newColor === assistedPlayerColor) return;
-        assistedPlayerColor = newColor;
-        if (currentFen && turnReliable) {
-          isPlayerTurn = (currentFen.split(' ')[1] || 'w') === assistedPlayerColor;
-          waitingForOpponent = !isPlayerTurn;
-        }
-        updatePlayerSelectorUI();
-        updatePositionContext();
-        // Update ARIA
-        $$('.player-btn').forEach(b => b.setAttribute('aria-checked', b.dataset.color === assistedPlayerColor ? 'true' : 'false'));
-        saveSettings();
-        lastEngineRecommendationFen = null;
-        lastEngineRecommendationUci = null;
-        chrome.runtime.sendMessage({ type: 'player_color_changed' }).catch(() => {});
-        if (lastAnalysis) {
-          renderAnalysis(lastAnalysis);
-        }
-        if (currentFen) {
-          requestAnalysis();
-        }
-      });
-    });
-
-    // Non-destructive refresh — coordinator keeps caches, quotas and cooldowns
-    if (dom.btnRefresh) {
-      dom.btnRefresh.addEventListener('click', () => {
-        if (isRefreshing) return;
-        isRefreshing = true;
-        dom.btnRefresh.classList.add('spinning');
-        updateEngineStatus('analyzing', 'Refreshing analysis...');
-        requestAnalysis(true);
-        refreshSafetyTimer = setTimeout(finishRefresh, 20000);
-      });
+  function closeSettingsSheet() {
+    if (!dom.settingsSheet) return;
+    if (!dom.settingsSheet.hidden || dom.settingsSheet.classList.contains('sheet--closing')) {
+      dom.settingsSheet.classList.add('sheet--closing');
+      settingsSheetCloseTimer = setTimeout(() => {
+        dom.settingsSheet.hidden = true;
+        dom.settingsSheet.classList.remove('sheet--closing');
+        settingsSheetCloseTimer = null;
+      }, REDUCED_MOTION ? 0 : 210);
     }
-
-    // Health check button
-    if (dom.btnHealthCheck) {
-      dom.btnHealthCheck.addEventListener('click', () => {
-        runHealthCheck();
-      });
-    }
-
-    // Clear caches button
-    if (dom.btnClearCaches) {
-      const ORIGINAL_TEXT = dom.btnClearCaches.textContent || 'Clear Caches';
-      dom.btnClearCaches.addEventListener('click', () => {
-        chrome.runtime.sendMessage({ type: 'clear_caches' }).catch(() => {});
-        showToast('All caches cleared', 'success', 2500);
-        if (dom.btnClearCaches) {
-          dom.btnClearCaches.textContent = 'Caches Cleared!';
-          // Restore the *exact* original label.
-          setTimeout(() => { dom.btnClearCaches.textContent = ORIGINAL_TEXT; }, 2000);
-        }
-      });
-    }
-
-    // Theme follows the browser/OS color-scheme preference.
-
-    // Settings and CSP-safe shortcut-help close button + scrim dismissal
-    const closeShortcutHelp = document.getElementById('btn-close-shortcut-help');
-    if (closeShortcutHelp) closeShortcutHelp.addEventListener('click', closeShortcuts);
-    const shortcutScrim = document.querySelector('[data-close-shortcuts]');
-    if (shortcutScrim) shortcutScrim.addEventListener('click', closeShortcuts);
-    if (dom.btnSettings) dom.btnSettings.addEventListener('click', openSettingsSheet);
-    if (dom.btnCloseSettings) dom.btnCloseSettings.addEventListener('click', closeSettingsSheet);
-
-    const settingEls = {
-      'setting-analysis-quality': (v) => { settings.analysisQuality = v; },
-      'setting-candidate-lines': (v) => { settings.candidateLines = v === 'auto' ? 'auto' : parseInt(v, 10); },
-      'setting-style': (v) => { settings.style = normalizeStyle(v); },
-      'setting-early-king-hunt': (v) => { settings.earlyKingHuntEnabled = v === true; },
-      'setting-human-like-mode': (v) => { settings.humanLikeMode = v; },
-      'setting-sparring-strength': (v) => {
-        const strength = Math.round(Number(v));
-        settings.sparringStrength = Number.isFinite(strength) ? strength : 1100;
-        const out = document.getElementById('sparring-strength-value');
-        if (out) out.textContent = String(settings.sparringStrength);
-      },
-      'setting-auto-analyze': (v) => { settings.autoAnalyze = v; },
-      'setting-show-threats': (v) => { settings.showThreats = v; },
-      'setting-show-critical-moments': (v) => { settings.showCriticalMoments = v; },
-      'setting-use-chess-api': (v) => { settings.useChessApi = v; },
-      'setting-use-lichess-cloud': (v) => { settings.useLichessCloud = v; },
-      'setting-use-maia3': (v) => { settings.useMaia3 = v; },
-      'setting-use-masters-explorer': (v) => { settings.useMastersExplorer = v; },
-      'setting-maia-only': (v) => {
-        settings.maiaOnlyMode = v === true;
-        if (settings.maiaOnlyMode === true) {
-          settings.humanLikeMode = false;
-          settings.style = 'normal';
-          settings.useMaia3 = true;
-        }
-      },
-      'setting-maia-rating': (v) => {
-        const rating = Math.round(Number(v));
-        settings.maiaRating = Number.isFinite(rating) ? Math.max(600, Math.min(2600, Math.round(rating / 100) * 100)) : 1500;
-        const out = document.getElementById('maia-rating-value');
-        if (out) out.textContent = String(settings.maiaRating);
-      },
-      'setting-maia-lines': (v) => { settings.maiaCandidateLines = v === 'auto' ? 'auto' : parseInt(v, 10); },
-    };
-
-    Object.entries(settingEls).forEach(([id, handler]) => {
-      const el = $(`#${id}`);
-      if (!el) return;
-      el.addEventListener('change', () => {
-        if (isMaiaOnlyActive() && ['setting-style', 'setting-human-like-mode', 'setting-sparring-strength',
-          'setting-analysis-quality', 'setting-candidate-lines',
-          'setting-use-chess-api', 'setting-use-lichess-cloud', 'setting-use-masters-explorer'].includes(id)) {
-          showToast('Disabled in Maia-exclusive mode', 'warning', 2500);
-          applySettingsToUI();
-          return;
-        }
-        const val = el.type === 'checkbox' ? el.checked : el.value;
-        handler(val);
-        const savePromise = saveSettings();
-        applySettingsToUI();
-        if ((id === 'setting-style' || id === 'setting-human-like-mode' || id === 'setting-early-king-hunt' || id === 'setting-show-threats') && lastAnalysis) {
-          humanPlanState = null;
-          renderAnalysis(lastAnalysis);
-          // Human mode changes routing policy too (steady depth, max MultiPV),
-          // so a fresh analysis must replace results fetched under the old one.
-          if (id === 'setting-human-like-mode' && currentFen) {
-            savePromise.finally(() => requestAnalysis(true));
-          }
-        }
-        if (['setting-use-chess-api', 'setting-use-lichess-cloud', 'setting-use-maia3', 'setting-use-masters-explorer', 'setting-maia-only', 'setting-maia-rating', 'setting-maia-lines', 'setting-analysis-quality', 'setting-candidate-lines'].includes(id) && currentFen) {
-          // Ensure the worker sees the new source policy before it routes.
-          savePromise.finally(() => requestAnalysis(true));
-        }
-      });
-    });
-
-    chrome.runtime.onMessage.addListener(handleMessage);
-
-    // Human-mode segmented control (Engine | Human) drives the hidden checkbox.
-    $$('.human-mode-opt').forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (isMaiaOnlyActive()) {
-          showToast('Disabled in Maia-exclusive mode', 'warning', 2500);
-          return;
-        }
-        const el = $('#setting-human-like-mode');
-        if (!el) return;
-        const on = btn.dataset.mode === 'on';
-        if (el.checked === on) return;
-        el.checked = on;
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-      });
-    });
-
-    $$('[data-expressive-setting]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const field = $(`#${btn.dataset.expressiveSetting}`);
-        if (!field || field.disabled) return;
-        if (String(field.value) === String(btn.dataset.value)) return;
-        field.value = btn.dataset.value;
-        field.dispatchEvent(new Event('change', { bubbles: true }));
-      });
-    });
-
-    // Shared APG keyboard behavior includes the White/Black selector.
-    $$('[role="radiogroup"]').forEach((group) => {
-      group.addEventListener('keydown', (e) => {
-        if (!['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
-        const items = Array.from(group.querySelectorAll('[role="radio"]')).filter(el => !el.disabled);
-        const index = items.indexOf(document.activeElement);
-        if (index === -1 || !items.length) return;
-        e.preventDefault();
-        const dir = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1 : -1;
-        const target = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1
-          : (index + dir + items.length) % items.length;
-        items[target].focus();
-        items[target].click();
-        layoutSegmented(group);
-      });
-    });
   }
 
-  // ─── Passive Provider Status and Local Usage Diagnostics ─────────────
-  let healthCheckInFlight = false;
-
+  // ─── Health Check ─────────────────────────────────────────────────
   function formatCooldown(ms) {
     const totalSeconds = Math.max(0, Math.ceil((ms || 0) / 1000));
     if (totalSeconds < 60) return `${totalSeconds}s`;
@@ -990,7 +700,7 @@
 
   function renderApiDiagnostics(diagnostics) {
     if (!diagnostics) return;
-    const setText = (id, value) => { const element = document.getElementById(id); if (element) element.textContent = String(value ?? 0); };
+    const setText = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = String(value ?? 0); };
     setText('api-cache-avoided', diagnostics.remoteCallsAvoidedByCache);
     setText('api-requests-coalesced', diagnostics.requestsCoalesced);
     setText('api-stale-served', diagnostics.staleResultsServed);
@@ -1036,21 +746,13 @@
     });
   }
 
-  // ─── Handle Messages ───────────────────────────────────────────────
+  // ─── Message Handler ──────────────────────────────────────────────
   function handleMessage(message, sender, sendResponse) {
     switch (message.type) {
-      case 'analysis_update':
-        handleAnalysisResult(message.data);
-        break;
-      case 'analysis_error':
-        handleAnalysisError(message.data);
-        break;
-      case 'turn_status_update':
-        handleTurnStatusUpdate(message.data);
-        break;
-      case 'opening_data_update':
-        handleOpeningDataUpdate(message.data);
-        break;
+      case 'analysis_update': handleAnalysisResult(message.data); break;
+      case 'analysis_error': handleAnalysisError(message.data); break;
+      case 'turn_status_update': handleTurnStatusUpdate(message.data); break;
+      case 'opening_data_update': handleOpeningDataUpdate(message.data); break;
     }
     return false;
   }
@@ -1062,26 +764,39 @@
     dom.positionContext.classList.toggle('partial', !positionReliable && turnReliable);
     dom.positionContext.classList.toggle('pending', !turnReliable);
     dom.positionTurn.textContent = !turnReliable
-      ? 'Waiting for a board'
+      ? 'Waiting for a game'
       : (isPlayerTurn ? 'Your turn' : 'Opponent turn');
   }
 
-  // Hide engine scaffolding (eval bar, position info) until a board position
-  // is detected, so the hint section shows alone instead of dead placeholders.
   function syncWelcome() {
     const app = document.getElementById('app');
     if (app) app.classList.toggle('no-position', !currentFen);
-    // The welcome block lives inside the hero stage: visible only while no
-    // board exists at all, hidden the moment any real content can land.
     if (dom.heroWelcome) dom.heroWelcome.hidden = Boolean(currentFen);
+  }
+
+  function updateEngineStatus(status, text) {
+    if (dom.statusDot) dom.statusDot.className = `status-dot ${status}`;
+    if (dom.statusText) dom.statusText.textContent = text;
+    const app = document.getElementById('app');
+    if (app) app.classList.toggle('analyzing', status === 'analyzing' || status === 'connecting');
+  }
+
+  // ─── Position Handling ────────────────────────────────────────────
+  function isNewGame(oldFen, newFen) {
+    const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+    const newPlacement = newFen.split(' ')[0];
+    const startPlacement = startFen.split(' ')[0];
+    if (newPlacement === startPlacement && oldFen.split(' ')[0] !== startPlacement) return true;
+    const oldMoveNum = parseInt(oldFen.split(' ')[5]) || 1;
+    const newMoveNum = parseInt(newFen.split(' ')[5]) || 1;
+    if (newMoveNum < oldMoveNum - 2) return true;
+    return false;
   }
 
   function handlePositionUpdate(message) {
     const prevFen = currentFen;
     currentFen = message.fen;
-    if (prevFen && prevFen !== currentFen) {
-      lastPositionFen = prevFen;
-    }
+    if (prevFen && prevFen !== currentFen) lastPositionFen = prevFen;
     syncWelcome();
     const positionChanged = !prevFen || prevFen.split(' ').slice(0, 4).join(' ') !== currentFen.split(' ').slice(0, 4).join(' ');
     playerColor = message.playerColor || 'w';
@@ -1103,32 +818,23 @@
       waitingForOpponent = false;
       renderMoveClassificationEmpty();
       setBalanceEmptyState();
-      // Reset the engine-side correlation tracker + sacrifice history.
       chrome.runtime.sendMessage({ type: 'reset_correlation' }).catch(() => {});
       if (window.ChessHintEngine && typeof window.ChessHintEngine.resetSacrificeHistory === 'function') {
         window.ChessHintEngine.resetSacrificeHistory();
       }
-      // Clear local engine-recommendation tracking too.
       lastEngineRecommendationFen = null;
       lastEngineRecommendationUci = null;
       humanPlanState = null;
     }
 
-    // Turn-based analysis — check whose turn it is before analyzing
     const activeColor = currentFen ? (currentFen.split(' ')[1] || 'w') : 'w';
     const effectiveColor = assistedPlayerColor || playerColor || 'w';
     const wasPlayerTurn = isPlayerTurn;
     isPlayerTurn = activeColor === effectiveColor;
     waitingForOpponent = !isPlayerTurn;
-    turnJustChanged = !wasPlayerTurn && isPlayerTurn; // Turn just changed to player's turn
+    turnJustChanged = !wasPlayerTurn && isPlayerTurn;
     updatePositionContext();
 
-    // Detect that the player just moved (transition
-    // from "player's turn" to "opponent's turn" while we had a stored engine
-    // recommendation for the previous FEN). Infer the move by applying the
-    // engine's recommended UCI to the previous FEN and comparing placements —
-    // if they match, the player played the engine move; otherwise we still
-    // report the actual resulting FEN so background can record "didn't match".
     if (wasPlayerTurn && !isPlayerTurn && lastEngineRecommendationFen && lastEngineRecommendationUci) {
       tryReportPlayerMove(lastEngineRecommendationFen, lastEngineRecommendationUci, currentFen);
       lastEngineRecommendationFen = null;
@@ -1146,13 +852,9 @@
     }
 
     if (isPlayerTurn) {
-      // It's the player's turn — request analysis
-      if (positionChanged && (settings.autoAnalyze || turnJustChanged)) {
-        requestAnalysis();
-      }
+      if (positionChanged && (settings.autoAnalyze || turnJustChanged)) requestAnalysis();
       updateEngineStatus(wasPlayerTurn ? 'online' : 'analyzing', turnJustChanged ? 'Your turn: analyzing...' : 'Your turn');
     } else {
-      // It's the opponent's turn — show waiting status, no API calls
       const playerLabel = effectiveColor === 'w' ? 'White' : 'Black';
       updateEngineStatus('online', `Opponent's turn: waiting...`);
       if (dom.hintText && !lastAnalysis) {
@@ -1162,28 +864,18 @@
     }
   }
 
-  // Compare the player's actual resulting FEN to the
-  // FEN we'd get if they'd played the engine's recommendation. If they match
-  // (piece placement + side to move, ignoring move counters), record a match.
-  // Otherwise, we still try to derive the actual UCI from the FEN diff and
-  // report that. Falls back gracefully if anything is unclear.
   function tryReportPlayerMove(engineFen, engineUci, actualFen) {
     if (!engineFen || !engineUci || !actualFen) return;
-    // Background has the stored engine UCI for this FEN and applies it before
-    // comparing the observed resulting placement, including special moves.
     chrome.runtime.sendMessage({
       type: 'record_player_move',
       prevFen: engineFen,
       actualFen: actualFen
     }).then((result) => {
-      // result may be null if no stored engine recommendation for that FEN.
       if (result && typeof result.matched === 'boolean') updateCorrelationStat();
     }).catch(() => {});
   }
 
-  // Pull current correlation stats from background and render them in
-  // the "Sensible moves" row of the position-info card: high = you are
-  // following the coach's reasoning, low = blindly copying engine picks.
+  // ─── Correlation Stat ─────────────────────────────────────────────
   function updateCorrelationStat() {
     if (!dom.correlationStat) return;
     chrome.runtime.sendMessage({ type: 'get_correlation_stats' }).then((stats) => {
@@ -1193,22 +885,20 @@
       }
       const pct = stats.total > 0 ? Math.round((stats.matches / stats.total) * 100) : 0;
       dom.correlationStat.textContent = `${stats.matches} / ${stats.total} (${pct}%)`;
-      // Color cue — green = own thinking, yellow = mixed, red = copying.
       if (stats.total === 0) {
-        dom.correlationStat.style.color = 'var(--text-secondary)';
+        dom.correlationStat.style.color = 'var(--role-on-surface-muted)';
       } else if (pct >= 80) {
-        dom.correlationStat.style.color = 'var(--accent-green)';
+        dom.correlationStat.style.color = 'var(--role-you)';
       } else if (pct >= 60) {
-        dom.correlationStat.style.color = 'var(--accent-yellow)';
+        dom.correlationStat.style.color = 'var(--role-attack)';
       } else {
-        dom.correlationStat.style.color = 'var(--accent-red)';
+        dom.correlationStat.style.color = 'var(--role-opp)';
       }
     }).catch(() => {
-      dom.correlationStat.textContent = '\u2013';
+      dom.correlationStat.textContent = '–';
     });
   }
 
-  // Handle turn status updates from background script
   function handleTurnStatusUpdate(data) {
     if (!data) return;
     isPlayerTurn = data.isPlayerTurn;
@@ -1234,122 +924,8 @@
     }
   }
 
-  function isNewGame(oldFen, newFen) {
-    const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
-    const newPlacement = newFen.split(' ')[0];
-    const startPlacement = startFen.split(' ')[0];
-    if (newPlacement === startPlacement && oldFen.split(' ')[0] !== startPlacement) return true;
-    const oldMoveNum = parseInt(oldFen.split(' ')[5]) || 1;
-    const newMoveNum = parseInt(newFen.split(' ')[5]) || 1;
-    if (newMoveNum < oldMoveNum - 2) return true;
-    return false;
-  }
-
-  function handleAnalysisResult(data) {
-    if (!data || !currentFen) return;
-    // A slower cloud response for an earlier position must never overwrite the
-    // current board. Compare placement + turn because reconstructed counters
-    // may legitimately differ between the request and the next poll.
-    const resultKey = (data.fen || '').split(' ').slice(0, 4).join(' ');
-    const currentKey = currentFen.split(' ').slice(0, 4).join(' ');
-    if (!resultKey || resultKey !== currentKey) return;
-    const wasUserRefresh = isRefreshing;
-    lastAnalysis = data;
-
-    if (data.pvs && data.pvs.length > 0) {
-      const bestPV = data.pvs[0];
-      const effectiveColor = assistedPlayerColor || playerColor || 'w';
-      // Convert score to player's perspective for consistent tracking
-      const evalScore = effectiveColor === 'w' ? bestPV.score : -bestPV.score;
-      evalHistory.push({ fen: data.fen, score: evalScore, scoreType: bestPV.scoreType });
-      if (evalHistory.length > 50) evalHistory.shift();
-      if (prevEval !== null) {
-        // The mover is the side that just played — the opposite of the
-        // current side to move. Rating from the mover's perspective keeps
-        // the sign correct for both players. Normalise evals back to
-        // White's perspective (classifyMove's contract) first.
-        const prevWhite = effectiveColor === 'w' ? prevEval : -prevEval;
-        const currWhite = effectiveColor === 'w' ? evalScore : -evalScore;
-        const fenActiveColor = (data.fen || '').split(' ')[1] || 'w';
-        const moverColor = fenActiveColor === 'w' ? 'b' : 'w';
-
-        let moveSan = null;
-        if (lastAnalyzedFen && data.fen && lastAnalyzedFen !== data.fen) {
-          moveSan = inferMoveSan(lastAnalyzedFen, data.fen);
-        } else if (lastPositionFen && data.fen && lastPositionFen !== data.fen) {
-          moveSan = inferMoveSan(lastPositionFen, data.fen);
-        }
-        if (!moveSan && Array.isArray(data.moveHistory) && data.moveHistory.length > 0) {
-          const lastMove = data.moveHistory[data.moveHistory.length - 1];
-          if (typeof lastMove === 'string' && lastMove) {
-            moveSan = lastMove.length >= 4 && /^[a-h][1-8][a-h][1-8]/.test(lastMove) && window.ChessHintEngine?.uciToSan
-              ? window.ChessHintEngine.uciToSan(lastMove, data.fen)
-              : lastMove;
-          }
-        }
-
-        renderMoveClassification(prevWhite, currWhite, {
-          moverColor,
-          moveSan,
-          scoreTypeBefore: prevScoreType || 'cp',
-          scoreTypeAfter: bestPV.scoreType
-        });
-      } else {
-        renderMoveClassificationEmpty();
-      }
-      prevEval = evalScore;
-      prevScoreType = bestPV.scoreType;
-      lastAnalyzedFen = data.fen;
-
-      // Remember the engine's first-choice move +
-      // the FEN it was recommended for, so when the player makes their move
-      // we can compare and update the correlation tracker.
-      if (data.fen && bestPV.pv && bestPV.pv.length > 0) {
-        lastEngineRecommendationFen = data.fen;
-        lastEngineRecommendationUci = bestPV.pv[0];
-      }
-    }
-
-    updateEngineStatus('online', data.stale ? 'Cached analysis (stale)' : 'Analysis complete');
-    renderAnalysis(data);
-    runHealthCheck();
-
-    // Toast only on user-initiated refresh, not every
-    // auto-analysis. The `isRefreshing` flag is set when the user clicks
-    // Refresh and cleared only when this workflow settles.
-    if (data.source && wasUserRefresh) {
-      showToast(`Analysis ready via ${sourceDisplayName(data.source, data)}`, 'success', 2000);
-    }
-
-    if (data.exactHintBlocked) {
-      showToast(data.exactHintBlocked.message, 'warning', 3500);
-    }
-
-    // Refresh the correlation stat in the UI.
-    updateCorrelationStat();
-    if (wasUserRefresh) finishRefresh();
-  }
-
-  function handleAnalysisError(data) {
-    if (!data) return;
-    if (data.fen && currentFen && data.fen.split(' ').slice(0, 4).join(' ') !== currentFen.split(' ').slice(0, 4).join(' ')) return;
-    const errorMsg = data.error || 'Cloud analysis unavailable.';
-    if (isRefreshing) finishRefresh();
-    updateEngineStatus('error', errorMsg);
-    setBalanceErrorState(errorMsg);
-    // Show toast for errors
-    showToast(errorMsg, 'error', 4000);
-    if (dom.hintText) {
-      // The background already classifies retry, wait, and hard-budget states.
-      // Do not suggest Refresh for a state where it cannot help.
-      dom.hintText.textContent = errorMsg;
-    }
-    hideIdeaRail();
-  }
-
   function handleOpeningDataUpdate(data) {
     if (!data || !data.openingData) return;
-    // Update opening data in last analysis if we have it
     if (lastAnalysis && lastAnalysis.fen === data.fen) {
       lastAnalysis.openingData = data.openingData;
       if (dom.openingName && data.openingData.opening) {
@@ -1358,7 +934,7 @@
     }
   }
 
-  // ─── Request Analysis ──────────────────────────────────────────────
+  // ─── Request Analysis ─────────────────────────────────────────────
   function requestAnalysis(refresh = false) {
     if (!currentFen) return;
     updateEngineStatus('analyzing', refresh ? 'Refreshing...' : 'Analyzing...');
@@ -1379,7 +955,88 @@
     }).catch(() => {});
   }
 
-  // ─── Render Analysis ───────────────────────────────────────────────
+  // ─── Analysis Result Handling ─────────────────────────────────────
+  function handleAnalysisResult(data) {
+    if (!data || !currentFen) return;
+    const resultKey = (data.fen || '').split(' ').slice(0, 4).join(' ');
+    const currentKey = currentFen.split(' ').slice(0, 4).join(' ');
+    if (!resultKey || resultKey !== currentKey) return;
+
+    const wasUserRefresh = isRefreshing;
+    lastAnalysis = data;
+
+    if (data.pvs && data.pvs.length > 0) {
+      const bestPV = data.pvs[0];
+      const effectiveColor = assistedPlayerColor || playerColor || 'w';
+      const evalScore = effectiveColor === 'w' ? bestPV.score : -bestPV.score;
+      evalHistory.push({ fen: data.fen, score: evalScore, scoreType: bestPV.scoreType });
+      if (evalHistory.length > 50) evalHistory.shift();
+
+      if (prevEval !== null) {
+        const prevWhite = effectiveColor === 'w' ? prevEval : -prevEval;
+        const currWhite = effectiveColor === 'w' ? evalScore : -evalScore;
+        const fenActiveColor = (data.fen || '').split(' ')[1] || 'w';
+        const moverColor = fenActiveColor === 'w' ? 'b' : 'w';
+        let moveSan = null;
+        if (lastAnalyzedFen && data.fen && lastAnalyzedFen !== data.fen) {
+          moveSan = inferMoveSan(lastAnalyzedFen, data.fen);
+        } else if (lastPositionFen && data.fen && lastPositionFen !== data.fen) {
+          moveSan = inferMoveSan(lastPositionFen, data.fen);
+        }
+        if (!moveSan && Array.isArray(data.moveHistory) && data.moveHistory.length > 0) {
+          const lastMove = data.moveHistory[data.moveHistory.length - 1];
+          if (typeof lastMove === 'string' && lastMove) {
+            moveSan = lastMove.length >= 4 && /^[a-h][1-8][a-h][1-8]/.test(lastMove) && window.ChessHintEngine?.uciToSan
+              ? window.ChessHintEngine.uciToSan(lastMove, data.fen)
+              : lastMove;
+          }
+        }
+        renderMoveClassification(prevWhite, currWhite, {
+          moverColor,
+          moveSan,
+          scoreTypeBefore: prevScoreType || 'cp',
+          scoreTypeAfter: bestPV.scoreType
+        });
+      } else {
+        renderMoveClassificationEmpty();
+      }
+      prevEval = evalScore;
+      prevScoreType = bestPV.scoreType;
+      lastAnalyzedFen = data.fen;
+
+      if (data.fen && bestPV.pv && bestPV.pv.length > 0) {
+        lastEngineRecommendationFen = data.fen;
+        lastEngineRecommendationUci = bestPV.pv[0];
+      }
+    }
+
+    updateEngineStatus('online', data.stale ? 'Cached analysis (stale)' : 'Analysis complete');
+    renderAnalysis(data);
+    runHealthCheck();
+
+    if (data.source && wasUserRefresh) {
+      showToast(`Analysis ready via ${sourceDisplayName(data.source, data)}`, 'success', 2000);
+    }
+    if (data.exactHintBlocked) {
+      showToast(data.exactHintBlocked.message, 'warning', 3500);
+    }
+    updateCorrelationStat();
+    if (wasUserRefresh) finishRefresh();
+  }
+
+  function handleAnalysisError(data) {
+    if (!data) return;
+    if (data.fen && currentFen && data.fen.split(' ').slice(0, 4).join(' ') !== currentFen.split(' ').slice(0, 4).join(' ')) return;
+    const errorMsg = data.error || 'Cloud analysis unavailable.';
+    if (isRefreshing) finishRefresh();
+    updateEngineStatus('error', errorMsg);
+    setBalanceErrorState(errorMsg);
+    showToast(errorMsg, 'error', 4000);
+    if (dom.hintText) dom.hintText.textContent = errorMsg;
+    hideIdeaRail();
+  }
+
+  // ─── Eval Bar ──────────────────────────────────────────────────────
   function renderAnalysis(data) {
     const effectiveColor = assistedPlayerColor || playerColor || 'w';
     const objectivePvs = data.pvs || [];
@@ -1387,10 +1044,7 @@
     const styledPvs = objectivePvs.length > 0 && data.source !== 'tablebase' &&
       (objectivePvs.length > 1 || settings.humanLikeMode || earlyKingHuntActive)
       ? window.ChessHintEngine.selectPVForStyle(
-          objectivePvs,
-          data.fen,
-          settings.style,
-          effectiveColor,
+          objectivePvs, data.fen, settings.style, effectiveColor,
           settings.humanLikeMode,
           {
             activePlan: humanPlanState?.activePlan || null,
@@ -1402,11 +1056,6 @@
       : objectivePvs;
     const viewData = { ...data, pvs: styledPvs };
 
-    // Track the move the panel actually recommends. In human-like mode
-    // this is the human-natural styled pick (possibly different from the raw
-    // engine top move); the correlation guard uses it to distinguish human-like
-    // play from blind engine-top copies, and the FEN-diff reporter uses it as
-    // the expected move for the position.
     if (styledPvs.length > 0 && styledPvs[0].pv && styledPvs[0].pv.length > 0) {
       lastEngineRecommendationFen = data.fen;
       lastEngineRecommendationUci = styledPvs[0].pv[0];
@@ -1419,45 +1068,35 @@
       }
     }
 
-    // The evaluation bar remains objective; every move-oriented section below
-    // uses the same style-selected ordering.
     if (objectivePvs.length > 0) {
       const bestPV = objectivePvs[0];
       updateEvalBar(bestPV.score, bestPV.scoreType, effectiveColor, data.stale === true);
       updateEvalDescription(bestPV.score, bestPV.scoreType, effectiveColor);
     }
+
     renderPositionInfo(viewData);
     renderHints(viewData);
 
-    if (data.exactHintBlocked) {
-      return;
-    }
+    if (data.exactHintBlocked) return;
 
     if (settings.showCriticalMoments) {
       renderCriticalMoment(effectiveColor);
     } else if (dom.criticalMomentSection) {
-      dom.criticalMomentSection.style.display = 'none';
+      dom.criticalMomentSection.hidden = true;
     }
   }
 
   function updateEvalBar(score, scoreType, effectiveColor, isStale = false) {
     const isWhite = effectiveColor === 'w';
     const displayScore = isWhite ? score : -score;
-    // Single-ended meter: the white fill grows from the left to White's
-    // winning share; the inverse-surface remainder is Black's share.
     const whiteWinPct = window.ChessHintEngine.formatEvalBar(score, scoreType, true);
     const winFraction = whiteWinPct / 100;
-    if (dom.evalBarWhite) {
-      dom.evalBarWhite.style.transform = `scaleX(${winFraction})`;
-    }
+    if (dom.evalBarFill) dom.evalBarFill.style.transform = `scaleX(${winFraction})`;
 
-    // The win-probability breakdown lives inside the meter: the left pill
-    // sits over White's share, the right pill over Black's remainder. "You"
-    // and "Opp" follow the assisted player's color.
     const whiteShare = Math.round(whiteWinPct);
     const blackShare = 100 - whiteShare;
-    if (dom.evalBarWhitePct) dom.evalBarWhitePct.textContent = `${isWhite ? 'You' : 'Opp'} ${whiteShare}%`;
-    if (dom.evalBarBlackPct) dom.evalBarBlackPct.textContent = `${isWhite ? 'Opp' : 'You'} ${blackShare}%`;
+    if (dom.evalPctLeft) dom.evalPctLeft.textContent = `${isWhite ? 'You' : 'Opp'} ${whiteShare}%`;
+    if (dom.evalPctRight) dom.evalPctRight.textContent = `${isWhite ? 'Opp' : 'You'} ${blackShare}%`;
 
     const scoreStr = scoreType === 'mate'
       ? (displayScore > 0 ? `+M${displayScore}` : `-M${Math.abs(displayScore)}`)
@@ -1465,6 +1104,7 @@
     const oppStr = scoreType === 'mate'
       ? (displayScore > 0 ? `-M${displayScore}` : `+M${Math.abs(displayScore)}`)
       : (displayScore < 0 ? `+${(-displayScore / 100).toFixed(1)}` : (-displayScore / 100).toFixed(1));
+
     if (dom.evalBar) {
       const evalPawns = scoreType === 'mate'
         ? (displayScore > 0 ? 10 : -10) * Math.sign(displayScore || 1)
@@ -1472,8 +1112,6 @@
       const pct = Math.round(whiteWinPct);
       dom.evalBar.setAttribute('aria-valuenow', String(Math.max(-10, Math.min(10, evalPawns))));
       dom.evalBar.setAttribute('aria-valuetext', `${scoreStr} for ${isWhite ? 'White' : 'Black'}`);
-      // The fulcrum reads `--eval-pct` from an ancestor, so it lives on the
-      // tile, not on the bar itself.
       if (dom.evalSection) dom.evalSection.style.setProperty('--eval-pct', String(pct));
     }
     if (dom.evalStaleBadge) dom.evalStaleBadge.style.display = isStale ? 'inline-flex' : 'none';
@@ -1489,11 +1127,7 @@
     renderEvalSparkline();
   }
 
-  // ─── Eval trend sparkline ──────────────────────────────────────────
-  // The Balance tile already owns evalHistory; this draws the last stretch
-  // of it as a single quiet polyline under the ribbon. White's perspective,
-  // clamped to ±6 pawns, with a dashed zero line and an end dot. Hidden
-  // until two points exist so early positions stay calm.
+  // ─── Eval Sparkline ────────────────────────────────────────────────
   const SPARK_WINDOW = 20;
   function renderEvalSparkline() {
     if (!dom.evalSpark) return;
@@ -1505,7 +1139,6 @@
     }
     const W = 120, H = 28, MID = H / 2;
     const clampPawns = (cp) => Math.max(-600, Math.min(600, cp)) / 100;
-    // Mate scores sit at the rail; centipawn scores map linearly to ±6.
     const values = points.map((p) => (p.scoreType === 'mate' ? Math.sign(p.score || 1) * 6 : clampPawns(p.score)));
     const min = Math.min(...values), max = Math.max(...values);
     const span = Math.max(max - min, 1.5);
@@ -1533,367 +1166,149 @@
     dom.evalSpark.classList.add('is-live');
   }
 
+  // ─── Eval Description ──────────────────────────────────────────────
   function updateEvalDescription(score, scoreType, effectiveColor) {
-    const desc = window.ChessHintEngine.describeEval(score, scoreType, effectiveColor === 'w', true);
-    if (dom.evalDescription) dom.evalDescription.textContent = desc;
-  }
-
-  function updateEngineStatus(status, text) {
-    if (dom.statusDot) dom.statusDot.className = `status-dot ${status}`;
-    if (dom.statusText) dom.statusText.textContent = text;
-    const app = document.getElementById('app');
-    if (app) app.classList.toggle('analyzing', status === 'analyzing' || status === 'connecting');
-  }
-
-  let settingsSheetCloseTimer = null;
-
-  function setWorkspaceInert(value) {
-    document.querySelectorAll('.md-app-bar, .md-status, .md-canvas, .md-toolbar, .skip-link')
-      .forEach(element => { element.inert = value; });
-  }
-
-  function openSettingsSheet() {
-    if (!dom.settingsPanel) return;
-    if (settingsSheetCloseTimer) clearTimeout(settingsSheetCloseTimer);
-    dom.settingsPanel.classList.remove('md-sheet--closing');
-    dom.settingsPanel.style.display = 'flex';
-    setWorkspaceInert(true);
-    // Synchronize roving tab stops after settings become visible.
-    syncAllSegments();
-    runHealthCheck();
-  }
-
-  function closeSettingsSheet() {
-    if (!dom.settingsPanel) return;
-    const panel = dom.settingsPanel;
-    if (panel.style.display === 'none' || panel.classList.contains('md-sheet--closing')) return;
-    panel.classList.add('md-sheet--closing');
-    settingsSheetCloseTimer = setTimeout(() => {
-      panel.style.display = 'none';
-      panel.classList.remove('md-sheet--closing');
-      settingsSheetCloseTimer = null;
-      setWorkspaceInert(false);
-      dom.btnSettings?.focus();
-    }, REDUCED_MOTION ? 0 : 210);
-  }
-
-  function renderPositionInfo(data) {
-    if (dom.openingName) {
-      if (data.openingData && data.openingData.opening) {
-        dom.openingName.textContent = data.openingData.opening;
-      } else {
-        const opening = window.ChessHintEngine.detectOpening(data.moveHistory);
-        dom.openingName.textContent = opening ? opening.name : '\u2013';
-      }
-    }
-    if (dom.gamePhase && data.fen) {
-      const phase = window.ChessHintEngine.detectGamePhase(data.fen);
-      dom.gamePhase.textContent = phase.charAt(0).toUpperCase() + phase.slice(1);
-    }
-    if (dom.analysisQuality) {
-      const quality = window.AnalysisPolicy
-        ? window.AnalysisPolicy.describeQuality(data.qualityClass || window.AnalysisPolicy.qualityClassFor(data))
-        : { label: data.qualityLabel || '—' };
-      const stale = data.stale ? ' · stale' : '';
-      const confidence = Number.isFinite(data.confidence) ? ` · ${Math.round(data.confidence * 100)}%` : '';
-      dom.analysisQuality.textContent = `${quality.label}${stale}${confidence}`;
-      dom.analysisQuality.title = quality.detail || '';
-    }
-    if (dom.analysisSource) {
-      dom.analysisSource.textContent = data.source ? sourceDisplayName(data.source, data) : '–';
-      dom.analysisSource.title = data.stale ? 'Cached result' : '';
-    }
-    if (dom.materialBalance && data.fen) {
-      const assessment = window.ChessHintEngine.assessPosition(data.fen);
-      const balance = assessment.material.balance;
-      const effectiveColor = assistedPlayerColor || 'w';
-      const playerBalance = effectiveColor === 'w' ? balance : -balance;
-      if (playerBalance > 0) { dom.materialBalance.textContent = `You +${playerBalance}`; dom.materialBalance.style.color = 'var(--accent-green)'; }
-      else if (playerBalance < 0) { dom.materialBalance.textContent = `Opp +${Math.abs(playerBalance)}`; dom.materialBalance.style.color = 'var(--accent-red)'; }
-      else { dom.materialBalance.textContent = 'Equal'; dom.materialBalance.style.color = 'var(--text-secondary)'; }
-    }
-  }
-
-  // ─── Critical Moment Alert ────────────────────────────────────────
-  function renderCriticalMoment(effectiveColor) {
-    if (!dom.criticalMomentSection) return;
-
-    if (!evalHistory || evalHistory.length < 2) {
-      dom.criticalMomentSection.style.display = 'none';
+    if (!dom.evalDescription) return;
+    const isWhite = effectiveColor === 'w';
+    const displayScore = isWhite ? score : -score;
+    if (scoreType === 'mate' && displayScore === 0) {
+      dom.evalDescription.textContent = 'Checkmate';
       return;
     }
+    if (scoreType === 'mate') {
+      dom.evalDescription.textContent = displayScore > 0
+        ? `Mate in ${displayScore} · ${isWhite ? 'White' : 'Black'} is winning`
+        : `Mated in ${Math.abs(displayScore)} · ${isWhite ? 'Black' : 'White'} is winning`;
+      return;
+    }
+    const absPawns = Math.abs(score) / 100;
+    const sign = displayScore > 0 ? '+' : (displayScore < 0 ? '–' : '');
+    let text;
+    if (absPawns < 0.3) {
+      text = 'Dead equal position';
+    } else if (absPawns < 1) {
+      text = `${sign}${absPawns.toFixed(2)} pawn advantage — ${isWhite ? 'White' : 'Black'}`;
+    } else {
+      text = `${sign}${absPawns.toFixed(1)} pawns — ${isWhite ? 'White' : 'Black'}`;
+    }
+    dom.evalDescription.textContent = text;
+  }
 
-    const lastEval = evalHistory[evalHistory.length - 1];
-    const alert = window.ChessHintEngine.detectCriticalMoment(
+  // ─── Position Info ─────────────────────────────────────────────────
+  function renderPositionInfo(data) {
+    if (dom.openingName && data.openingData && data.openingData.opening) {
+      dom.openingName.textContent = data.openingData.opening;
+    } else if (dom.openingName) {
+      dom.openingName.textContent = '—';
+    }
+    if (dom.gamePhase && data.gamePhase) dom.gamePhase.textContent = data.gamePhase;
+    if (dom.materialBalance && window.ChessHintEngine && typeof window.ChessHintEngine.materialBalance === 'function') {
+      dom.materialBalance.textContent = window.ChessHintEngine.materialBalance(data.fen);
+    }
+    if (dom.analysisQuality && data.analysisParams && data.analysisParams.quality) {
+      dom.analysisQuality.textContent = data.analysisParams.quality;
+    }
+    if (dom.analysisSource && data.source) {
+      dom.analysisSource.textContent = sourceDisplayName(data.source, data);
+    }
+  }
+
+  // ─── Critical Moment ──────────────────────────────────────────────
+  function renderCriticalMoment(effectiveColor) {
+    if (!dom.criticalMomentSection || !dom.criticalMomentText || !dom.criticalMomentDetail) return;
+    if (!window.ChessHintEngine || typeof window.ChessHintEngine.analyzeCriticalMoment !== 'function') {
+      dom.criticalMomentSection.hidden = true;
+      return;
+    }
+    const result = window.ChessHintEngine.analyzeCriticalMoment({
+      lastAnalysis,
+      isPlayerTurn,
+      playerColor: effectiveColor,
       evalHistory,
-      lastEval.score,
-      lastEval.scoreType,
-      effectiveColor
-    );
-
-    if (!alert) {
-      dom.criticalMomentSection.style.display = 'none';
+      prevEval
+    });
+    if (!result || !result.isCritical) {
+      dom.criticalMomentSection.hidden = true;
       lastCriticalAlert = null;
       return;
     }
+    dom.criticalMomentSection.hidden = false;
+    dom.criticalMomentText.textContent = result.title || 'Critical moment';
+    dom.criticalMomentDetail.textContent = result.detail || '';
+    dom.criticalMomentSection.dataset.severity = result.severity || 'moderate';
 
-    if (lastCriticalAlert && lastCriticalAlert.type === alert.type) {
-      dom.criticalMomentSection.style.display = 'block';
-      return;
+    if (lastCriticalAlert !== result.title || true) {
+      if (!lastCriticalAlert) {
+        showToast(result.title, 'warning', 4000);
+      }
+      lastCriticalAlert = result.title;
     }
-
-    lastCriticalAlert = alert;
-    dom.criticalMomentSection.style.display = 'block';
-    dom.criticalMomentSection.style.animation = 'none';
-    dom.criticalMomentSection.offsetHeight;
-    dom.criticalMomentSection.style.animation = '';
-
-    if (dom.criticalMomentText) dom.criticalMomentText.textContent = alert.message;
-    if (dom.criticalMomentDetail) dom.criticalMomentDetail.textContent = alert.detail;
   }
 
-  // ─── Caption rail ("Why this move") ────────────────────────────────
-  // The hero shows only the move. Every supporting sentence the engine
-  // produces travels as a caption item and renders here, outside the hero.
-  const IDEA_KINDS = new Set(['idea', 'capture', 'sacrifice', 'cost', 'risk', 'kinghunt', 'posture', 'reply']);
-
+  // ─── Idea Rail ────────────────────────────────────────────────────
   function renderIdeaRail(captions) {
     if (!dom.ideaSection || !dom.ideaList) return;
-    const items = Array.isArray(captions) ? captions.filter(c => c && c.text) : [];
-    if (items.length === 0) {
+    if (!captions || captions.length === 0) {
       hideIdeaRail();
       return;
     }
-    dom.ideaList.textContent = '';
-    items.forEach((caption, index) => {
-      const kind = IDEA_KINDS.has(caption.kind) ? caption.kind : 'posture';
-      const row = document.createElement('div');
-      row.className = `md-idea__row md-idea__row--${kind}`;
-      row.setAttribute('role', 'listitem');
-      row.style.setProperty('--i', String(index));
-      const icon = document.createElement('span');
-      icon.className = 'md-idea__icon';
-      icon.setAttribute('aria-hidden', 'true');
-      const texts = document.createElement('div');
-      texts.className = 'md-idea__texts';
-      if (caption.label) {
-        const label = document.createElement('span');
-        label.className = 'md-idea__label';
-        label.textContent = caption.label;
-        texts.appendChild(label);
-      }
-      const body = document.createElement('span');
-      body.className = 'md-idea__body';
-      body.textContent = caption.text;
-      texts.appendChild(body);
-      row.append(icon, texts);
-      dom.ideaList.appendChild(row);
-    });
+    const items = captions.map((caption) => {
+      const kind = caption.kind || 'reply';
+      const label = caption.label || '';
+      const text = caption.text || '';
+      const svgIcon = kind === 'reply' ? '⤻' : (kind === 'threat' ? '⚡' : '→');
+      return `<li class="idea-item idea-item--${kind}">
+        <span class="idea-icon" aria-hidden="true">${svgIcon}</span>
+        <span class="idea-label">${h(label)}</span>
+        <span class="idea-text">${h(text)}</span>
+      </li>`;
+    }).join('');
+    dom.ideaList.innerHTML = items;
     dom.ideaSection.hidden = false;
+    dom.ideaSection.classList.add('fade-in');
+    setTimeout(() => dom.ideaSection.classList.remove('fade-in'), 300);
   }
 
   function hideIdeaRail() {
-    if (!dom.ideaSection) return;
-    dom.ideaSection.hidden = true;
-    if (dom.ideaList) dom.ideaList.textContent = '';
-  }
-
-  function attackTagsFor(uci, fen) {
-    const detector = window.ChessHintEngine && typeof window.ChessHintEngine.detectAttackTags === 'function'
-      ? window.ChessHintEngine.detectAttackTags
-      : null;
-    if (!detector || !uci || !fen) return { isAttack: false, tags: [] };
-    try {
-      return detector(uci, fen);
-    } catch (_) {
-      return { isAttack: false, tags: [] };
+    if (dom.ideaSection) {
+      dom.ideaSection.hidden = true;
+      dom.ideaSection.classList.remove('fade-in');
     }
   }
 
-  // ─── Also consider (alternative lines) ─────────────────────────────
-  // Candidate PVs beyond the recommended move, rendered read-only in the
-  // caption-rail dialect: piece chip + SAN + a share-of-best meter. Only
-  // lines close to the best score qualify — real alternatives, not filler.
+  // ─── Alternatives ──────────────────────────────────────────────────
   function renderAlternatives(data) {
     if (!dom.altsSection || !dom.altsList) return;
-    const pvs = Array.isArray(data.pvs) ? data.pvs : [];
-    const effectiveColor = assistedPlayerColor || playerColor || 'w';
-    const rows = [];
-    for (let i = 1; i < pvs.length && rows.length < 3; i++) {
-      const pv = pvs[i];
-      if (!pv || !Array.isArray(pv.pv) || !pv.pv[0]) continue;
-      const uci = pv.pv[0];
-      const san = window.ChessHintEngine && typeof window.ChessHintEngine.uciToSan === 'function'
-        ? window.ChessHintEngine.uciToSan(uci, data.fen)
-        : uci;
-      if (!san) continue;
-      const isWhite = effectiveColor === 'w';
-      // Score in the assisted player's perspective; alternatives are judged
-      // by how much of the best line's value they keep.
-      const myScore = isWhite ? pv.score : -pv.score;
-      const bestScore = (() => {
-        const b = pvs[0];
-        if (!b) return myScore;
-        const bs = isWhite ? b.score : -b.score;
-        return b.scoreType === 'mate' ? (bs > 0 ? 10000 - Math.abs(bs) * 100 : -10000 + Math.abs(bs) * 100)
-          : bs;
-      })();
-      const mineLinear = pv.scoreType === 'mate' ? (myScore > 0 ? 10000 - Math.abs(myScore) * 100 : -10000 + Math.abs(myScore) * 100)
-        : myScore;
-      const share = bestScore > 0 ? Math.max(5, Math.min(100, Math.round((mineLinear / bestScore) * 100))) : 100;
-      if (share < 70 && pv.scoreType !== 'mate') continue;   // clearly worse: not worth the pixels
-      const scoreStr = pv.scoreType === 'mate'
-        ? (myScore > 0 ? `M${Math.abs(myScore)}` : `−M${Math.abs(myScore)}`)
-        : `${myScore >= 0 ? '+' : ''}${(myScore / 100).toFixed(1)}`;
-      const attack = attackTagsFor(uci, data.fen);
-      rows.push({
-        san,
-        piece: PIECE_GLYPHS[effectiveColor === 'w' ? 'White' : 'Black'][sanPieceName(san)] || '',
-        sideClass: effectiveColor === 'w' ? 'md-alt-row--white' : 'md-alt-row--black',
-        scoreStr,
-        isMate: pv.scoreType === 'mate',
-        share,
-        isAttack: attack.isAttack,
-        attackTitle: attack.tags.join(' · ')
-      });
-    }
-    dom.altsList.textContent = '';
-    if (rows.length === 0) {
+    if (!data.pvs || data.pvs.length <= 1) {
       dom.altsSection.hidden = true;
       return;
     }
-    rows.forEach((row, index) => {
-      const el = document.createElement('div');
-      el.className = `md-alt-row ${row.sideClass}`;
-      el.setAttribute('role', 'listitem');
-      el.style.setProperty('--i', String(index));
-      el.style.setProperty('--share', String(row.share));
-      const piece = document.createElement('span');
-      piece.className = 'md-alt-row__piece';
-      piece.setAttribute('aria-hidden', 'true');
-      piece.textContent = row.piece;
-      const san = document.createElement('span');
-      san.className = 'md-alt-row__san';
-      san.textContent = row.san;
-      const meter = document.createElement('span');
-      meter.className = 'md-alt-row__meter';
-      meter.setAttribute('role', 'progressbar');
-      meter.setAttribute('aria-label', `Keeps about ${row.share}% of the best line's value`);
-      meter.setAttribute('aria-valuemin', '0');
-      meter.setAttribute('aria-valuemax', '100');
-      meter.setAttribute('aria-valuenow', String(row.share));
-      meter.title = `Keeps about ${row.share}% of the best line's value`;
-      const fill = document.createElement('span');
-      fill.className = 'md-alt-row__meter-fill';
-      meter.appendChild(fill);
-      const score = document.createElement('span');
-      score.className = 'md-alt-row__score' + (row.isMate ? ' is-mate' : '');
-      score.textContent = row.scoreStr;
-      el.append(piece, san, meter, score);
-      if (row.isAttack) {
-        const tag = document.createElement('span');
-        tag.className = 'md-alt-row__tag';
-        tag.textContent = 'Attack';
-        tag.setAttribute('aria-label', row.attackTitle ? `Aggressive attack: ${row.attackTitle}` : 'Aggressive attack');
-        if (row.attackTitle) tag.title = row.attackTitle;
-        el.append(tag);
-      }
-      dom.altsList.appendChild(el);
-    });
+    const alts = data.pvs.slice(1, 4);
+    if (alts.length === 0) { dom.altsSection.hidden = true; return; }
+    dom.altsList.innerHTML = alts.map((pv, i) => {
+      const scoreStr = pv.scoreType === 'mate'
+        ? (pv.score >= 0 ? `+M${pv.score}` : `-M${Math.abs(pv.score)}`)
+        : `${(pv.score / 100).toFixed(2)}`;
+      const uci = pv.pv && pv.pv[0];
+      const san = uci && window.ChessHintEngine && window.ChessHintEngine.uciToSan
+        ? window.ChessHintEngine.uciToSan(uci, data.fen)
+        : (uci || '–');
+      return `<li class="alt-item">
+        <span class="alt-rank">${i + 2}</span>
+        <span class="alt-move">${h(san)}</span>
+        <span class="alt-score">${h(scoreStr)}</span>
+      </li>`;
+    }).join('');
     dom.altsSection.hidden = false;
   }
 
-  // "Nf3" → "knight"; supports O-O castling (king), captures, and promotions.
-  function sanPieceName(san) {
-    const s = String(san || '');
-    if (/^O-O/.test(s)) return 'king';
-    const letter = s.charAt(0);
-    const map = { N: 'knight', B: 'bishop', R: 'rook', Q: 'queen', K: 'king' };
-    return map[letter] || 'pawn';
-  }
-
-  function hideAlternatives() {
-    if (!dom.altsSection) return;
-    dom.altsSection.hidden = true;
-    if (dom.altsList) dom.altsList.textContent = '';
-  }
-
-  // "White: knight: d1 → f3" becomes a piece-glyph + squares lockup.
-  // Anything that isn't that shape falls back to plain text.
-  const PIECE_GLYPHS = {
-    White: { pawn: '\u2659', knight: '\u2658', bishop: '\u2657', rook: '\u2656', queen: '\u2655', king: '\u2654' },
-    Black: { pawn: '\u265F', knight: '\u265E', bishop: '\u265D', rook: '\u265C', queen: '\u265B', king: '\u265A' }
-  };
-
-  function renderFromTo(raw) {
-    if (!dom.hintFromTo) return;
-    const match = /^(White|Black): ([a-z]+): ([a-h][1-8]) \u2192 ([a-h][1-8])$/.exec(raw || '');
-    if (!match) {
-      dom.hintFromTo.textContent = raw;
-      return;
-    }
-    const [, side, pieceName, from, to] = match;
-    const glyph = (PIECE_GLYPHS[side] || PIECE_GLYPHS.White)[pieceName] || '';
-    const pieceCls = side === 'White' ? 'is-white' : 'is-black';
-    dom.hintFromTo.innerHTML =
-      `<span class="sq-piece ${pieceCls}">${glyph}</span>` +
-      `<span class="sq">${h(from)}</span>` +
-      `<span class="sq-arrow" aria-hidden="true">\u2192</span>` +
-      `<span class="sq">${h(to)}</span>`;
-    const warningEl = document.getElementById('fair-play-warning');
-    if (warningEl) warningEl.style.display = 'none';
-  }
-
-  // ─── Hint Rendering ────────────────────────────────────────────────
-  function setHeroAttackTag(uci, fen) {
-    if (!dom.hintAttackTag) return;
-    const attack = attackTagsFor(uci, fen);
-    if (attack.isAttack) {
-      dom.hintAttackTag.textContent = 'Attack';
-      const attackLabel = attack.tags.length ? `Aggressive attack: ${attack.tags.join(' · ')}` : 'Aggressive attack';
-      dom.hintAttackTag.setAttribute('aria-label', attackLabel);
-      if (attack.tags.length) dom.hintAttackTag.title = attack.tags.join(' · ');
-      else dom.hintAttackTag.removeAttribute('title');
-      dom.hintAttackTag.hidden = false;
-    } else {
-      dom.hintAttackTag.hidden = true;
-    }
-  }
-
+  // ─── Hints ─────────────────────────────────────────────────────────
   function renderHints(data) {
-    if (data.exactHintBlocked) {
-      if (dom.hintAttackTag) dom.hintAttackTag.hidden = true;
-      if (dom.hintText) dom.hintText.textContent = data.exactHintBlocked.message;
-      if (dom.hintFromTo) dom.hintFromTo.style.display = 'none';
-      hideAlternatives();
-      if (dom.hintCard) dom.hintCard.className = 'hint-card exact-move blocked';
-      hideIdeaRail();
-      const warningEl = document.getElementById('fair-play-warning');
-      const warningText = document.getElementById('fair-play-warning-text');
-      if (warningEl) warningEl.style.display = 'flex';
-      if (warningText) warningText.textContent = data.exactHintBlocked.message;
-      return;
-    }
-    if (!data.pvs || data.pvs.length === 0) {
-      if (dom.hintAttackTag) dom.hintAttackTag.hidden = true;
-      if (dom.hintText) dom.hintText.textContent = 'Waiting for analysis...';
-      if (dom.hintFromTo) dom.hintFromTo.style.display = 'none';
-      hideIdeaRail();
-      hideAlternatives();
-      return;
-    }
-
-    // Convert currEval to player's perspective to match prevEval
-    // Both must be in the same perspective for correct move classification
-    const effectiveColor = assistedPlayerColor || 'w';
-    const currEvalPlayerPerspective = effectiveColor === 'w'
-      ? (data.pvs[0]?.score || 0)
-      : -(data.pvs[0]?.score || 0);
-
-    const effectiveHintLevel = EXACT_HINT_LEVEL;
+    if (!window.ChessHintEngine || typeof window.ChessHintEngine.generateHints !== 'function') return;
+    const effectiveColor = assistedPlayerColor || playerColor || 'w';
     const hints = window.ChessHintEngine.generateHints(
-      { ...data, prevEval, currEval: currEvalPlayerPerspective },
-      effectiveHintLevel,
+      { ...data, prevEval, currEval: data.pvs?.[0] ? (effectiveColor === 'w' ? data.pvs[0].score : -data.pvs[0].score) : 0 },
+      EXACT_HINT_LEVEL,
       effectiveColor,
       settings.style,
       null,
@@ -1904,25 +1319,9 @@
         formSession: settings.humanLikeMode ? (data.formSession || null) : null
       }
     );
-    if (settings.humanLikeMode && hints.styleAnalysis?.plan) {
-      humanPlanState = { activePlan: hints.styleAnalysis.plan, startedAtFen: data.fen };
-    }
-
     if (dom.hintText) {
       if (hints.bestMoveFromTo) {
-        // Keep SAN and mate context readable; the coordinate row helps beginners.
-        dom.hintText.replaceChildren();
-        const mate = /^(.*?) — MATE IN (\d+)$/.exec(hints.main);
-        const notation = document.createElement('span');
-        notation.className = 'hint-san';
-        notation.textContent = mate ? mate[1] : hints.main;
-        dom.hintText.append(notation);
-        if (mate) {
-          const context = document.createElement('span');
-          context.className = 'hint-mate';
-          context.textContent = `Mate in ${mate[2]}`;
-          dom.hintText.append(context);
-        }
+        dom.hintText.textContent = '';
         dom.hintText.classList.remove('fade-in');
       } else {
         dom.hintText.textContent = hints.main;
@@ -1930,16 +1329,11 @@
         setTimeout(() => dom.hintText.classList.remove('fade-in'), 300);
       }
     }
-
     const captions = Array.isArray(hints.captions) ? hints.captions.slice() : [];
     if (settings.showThreats && hints.threat) {
-      const alreadyCaptioned = captions.some((caption) => caption.kind === 'reply');
-      if (!alreadyCaptioned) {
-        captions.push({
-          kind: 'reply',
-          label: hints.threatLabel || 'Best reply',
-          text: hints.threat
-        });
+      const already = captions.some((c) => c.kind === 'reply');
+      if (!already) {
+        captions.push({ kind: 'reply', label: hints.threatLabel || 'Best reply', text: hints.threat });
       }
     } else {
       for (let i = captions.length - 1; i >= 0; i--) {
@@ -1958,23 +1352,63 @@
       }
     }
     setHeroAttackTag(data.pvs && data.pvs[0] && data.pvs[0].pv ? data.pvs[0].pv[0] : null, data.fen);
-
-    if (dom.hintCard) {
-      const styleClass = settings.style === 'super_ultra_aggressive' ? ' super-ultra-mode' : '';
-      const humanClass = settings.humanLikeMode ? ' human-mode' : '';
-      dom.hintCard.className = 'hint-card exact-move' + styleClass + humanClass;
-    }
-
   }
 
+  // ─── FromTo Hero ──────────────────────────────────────────────────
+  const SQUARE_SVG = {};
+  function renderFromTo(bestMoveFromTo) {
+    if (!dom.hintFromTo) return;
+    const { from, to } = bestMoveFromTo;
+    const fromSquare = typeof from === 'string' ? from : `${String.fromCharCode(97 + from.c)}${8 - from.r}`;
+    const toSquare = typeof to === 'string' ? to : `${String.fromCharCode(97 + to.c)}${8 - to.r}`;
+    const fromCol = fromSquare.charCodeAt(0) - 97;
+    const fromRow = parseInt(fromSquare[1]) - 1;
+    const toCol = toSquare.charCodeAt(0) - 97;
+    const toRow = parseInt(toSquare[1]) - 1;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 8 8');
+    svg.setAttribute('preserveAspectRatio', 'none');
+    svg.setAttribute('aria-label', `Suggested move: ${fromSquare}–${toSquare}`);
+    const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    arrow.setAttribute('class', 'fromto-arrow');
+    arrow.setAttribute('d', `M ${fromCol}.5 ${3.5} L ${toCol}.5 ${3.5} M ${toCol}.5 ${3.5} L ${toCol - 0.2} ${3.5 - 0.3} M ${toCol}.5 ${3.5} L ${toCol - 0.2} ${3.5 + 0.3}`);
+    const fromCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    fromCircle.setAttribute('class', 'fromto-circle fromto-circle--from');
+    fromCircle.setAttribute('cx', `${fromCol}.5`);
+    fromCircle.setAttribute('cy', `${3.5}`);
+    fromCircle.setAttribute('r', '0.35');
+    const toCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    toCircle.setAttribute('class', 'fromto-circle fromto-circle--to');
+    toCircle.setAttribute('cx', `${toCol}.5`);
+    toCircle.setAttribute('cy', `${3.5}`);
+    toCircle.setAttribute('r', '0.35');
+    svg.append(arrow, fromCircle, toCircle);
+    dom.hintFromTo.replaceChildren(svg, document.createTextNode(`${fromSquare}–${toSquare}`));
+  }
+
+  // ─── Hero Attack Tag ───────────────────────────────────────────────
+  function setHeroAttackTag(uci, fen) {
+    if (!dom.hintAttackTag || !fen) { if (dom.hintAttackTag) dom.hintAttackTag.hidden = true; return; }
+    const color = fen.split(' ')[1] || 'w';
+    const isAttacking = color === 'w';
+    const attackerColor = color === 'w' ? 'white' : 'black';
+    dom.hintAttackTag.textContent = isAttacking ? 'Attacking' : 'Defending';
+    dom.hintAttackTag.hidden = false;
+    if (dom.hintCard) {
+      dom.hintCard.className = dom.hintCard.className.replace(/(^|\s)(super-ultra-mode|human-mode)\b/g, '');
+      dom.hintCard.classList.add(isAttacking ? 'attacking' : 'defending');
+    }
+  }
+
+  // ─── Move Classification ───────────────────────────────────────────
   function renderMoveClassificationEmpty() {
     if (!dom.moveClassSection || !dom.moveClassDisplay) return;
     dom.moveClassSection.dataset.verdict = 'none';
     dom.moveClassSection.dataset.state = 'empty';
     dom.moveClassDisplay.innerHTML = `
-      <div class="md-verdict__empty">
-        <span class="md-verdict__empty-icon" aria-hidden="true"></span>
-        <p class="md-verdict__empty-text">Play a move to see how it rated</p>
+      <div class="verdict__empty">
+        <span class="verdict__empty-icon" aria-hidden="true"></span>
+        <p class="verdict__empty-text">Play a move to see how it rated</p>
       </div>
     `;
   }
@@ -1989,34 +1423,31 @@
     const effectiveColor = assistedPlayerColor || playerColor || 'w';
     const moverColor = (opts && opts.moverColor) || (effectiveColor === 'w' ? 'b' : 'w');
     const isPlayerMover = moverColor === effectiveColor;
-
     let moverText = '';
     if (opts && opts.moveSan) {
       moverText = isPlayerMover ? `You played ${opts.moveSan}` : `Opponent played ${opts.moveSan}`;
     } else {
       moverText = isPlayerMover ? 'Your last move' : "Opponent's last move";
     }
-
-    // A settings change re-renders the same stored analysis; only a genuinely
-    // new classification earns the pop + count-up.
     const isNewVerdict = dom.moveClassSection.dataset.verdictKey !== `${opts && opts.moveSan}|${cls.label}|${acc}`;
     dom.moveClassSection.dataset.verdictKey = `${opts && opts.moveSan}|${cls.label}|${acc}`;
-
     dom.moveClassSection.dataset.verdict = cls.label.toLowerCase();
     dom.moveClassSection.dataset.state = 'data';
     const symbol = cls.symbol
-      ? ` <span class="md-verdict__symbol" aria-hidden="true">${h(cls.symbol)}</span>`
+      ? ` <span class="verdict__symbol" aria-hidden="true">${h(cls.symbol)}</span>`
       : '';
     dom.moveClassDisplay.innerHTML = `
-      <div class="md-verdict__copy">
-        <p class="md-verdict__mover">${h(moverText)}</p>
-        <p class="md-verdict__label">${h(cls.label)}${symbol}</p>
-        <p class="md-verdict__metric">${h(swing)}</p>
+      <div class="verdict__copy">
+        <p class="verdict__mover">${h(moverText)}</p>
+        <p class="verdict__label">${h(cls.label)}${symbol}</p>
+        <p class="verdict__metric">${h(swing)}</p>
       </div>
-      <div class="md-verdict__ring" style="--acc: ${acc}" role="img" title="Engine accuracy estimate for this move (${acc}/100)" aria-label="Engine accuracy estimate ${acc} of 100">
-        <span class="md-verdict__ring-stack">
-          <span class="md-verdict__ring-val">${h(acc)}</span>
-          <span class="md-verdict__ring-cap">/ 100</span>
+      <div class="verdict__ring" style="--acc: ${acc}" role="img"
+           title="Engine accuracy estimate for this move (${acc}/100)"
+           aria-label="Engine accuracy estimate ${acc} of 100">
+        <span class="verdict__ring-stack">
+          <span class="verdict__ring-val">${h(String(acc))}</span>
+          <span class="verdict__ring-cap">/ 100</span>
         </span>
       </div>
     `;
@@ -2024,24 +1455,286 @@
       dom.moveClassSection.classList.remove('pop');
       void dom.moveClassSection.offsetHeight;
       dom.moveClassSection.classList.add('pop');
-      const ringVal = dom.moveClassDisplay.querySelector('.md-verdict__ring-val');
+      const ringVal = dom.moveClassDisplay.querySelector('.verdict__ring-val');
       if (ringVal) animateCountUp(ringVal, acc, 520);
     }
   }
 
-  // Small rAF count-up for the verdict accuracy figure. Ends exactly on the
-  // real value; skipped entirely under reduced motion.
   function animateCountUp(el, target, duration) {
     const start = performance.now();
     const tick = (now) => {
       const t = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);   // ease-out cubic
+      const eased = 1 - Math.pow(1 - t, 3);
       el.textContent = String(Math.round(eased * target));
       if (t < 1) requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
   }
 
-  // ─── Start ─────────────────────────────────────────────────────────
-  init();
+  // ─── Finish Refresh ───────────────────────────────────────────────
+  function finishRefresh() {
+    if (refreshSafetyTimer) clearTimeout(refreshSafetyTimer);
+    refreshSafetyTimer = null;
+    if (dom.btnRefresh) dom.btnRefresh.classList.remove('spinning');
+    isRefreshing = false;
+  }
+
+  // ─── Scroll Elevation ─────────────────────────────────────────────
+  function initScrollElevation() {
+    const sheet = document.querySelector('.scroll-elevation');
+    if (!sheet) return;
+    let ticking = false;
+    const update = () => {
+      if (!sheet) return;
+      const hasScroll = sheet.scrollHeight > sheet.clientHeight + 1;
+      const atTop = sheet.scrollTop <= 0;
+      sheet.classList.toggle('is-scrolled', hasScroll && !atTop);
+      ticking = false;
+    };
+    const onScroll = () => {
+      if (!ticking) { ticking = true; requestAnimationFrame(update); }
+    };
+    sheet.addEventListener('scroll', onScroll, { passive: true });
+    if (typeof ResizeObserver === 'function') {
+      new ResizeObserver(() => update()).observe(sheet);
+    }
+    update();
+  }
+
+  // ─── Version Stamp ─────────────────────────────────────────────────
+  function stampVersion() {
+    chrome.runtime.getManifest().then((manifest) => {
+      if (!manifest || !manifest.version) return;
+      const el = document.getElementById('extension-version');
+      if (el) el.textContent = `v${manifest.version}`;
+    }).catch(() => {
+      chrome.runtime.sendMessage({ type: 'get_version' }, (response) => {
+        if (response && response.version) {
+          const el = document.getElementById('extension-version');
+          if (el) el.textContent = `v${response.version}`;
+        }
+      });
+    });
+  }
+
+  // ─── Event Binding ─────────────────────────────────────────────────
+  function bindEventHandlers() {
+    if (dom.btnSettings) {
+      dom.btnSettings.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (dom.settingsSheet && !dom.settingsSheet.hidden) closeSettingsSheet();
+        else openSettingsSheet();
+      });
+      dom.btnSettings.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (dom.settingsSheet && !dom.settingsSheet.hidden) closeSettingsSheet();
+          else openSettingsSheet();
+        }
+      });
+    }
+
+    if (dom.btnCloseSettings) {
+      dom.btnCloseSettings.addEventListener('click', closeSettingsSheet);
+    }
+
+    if (dom.btnRefresh) {
+      dom.btnRefresh.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (isRefreshing) return;
+        isRefreshing = true;
+        if (dom.btnRefresh) dom.btnRefresh.classList.add('spinning');
+        const safety = setTimeout(() => {
+          isRefreshing = false;
+          if (dom.btnRefresh) dom.btnRefresh.classList.remove('spinning');
+        }, 8000);
+        refreshSafetyTimer = safety;
+        requestAnalysis(true);
+      });
+    }
+
+    if (dom.btnHealthCheck) {
+      dom.btnHealthCheck.addEventListener('click', runHealthCheck);
+    }
+
+    if (dom.btnClearCaches) {
+      dom.btnClearCaches.addEventListener('click', async () => {
+        await chrome.runtime.sendMessage({ type: 'clear_cache' });
+        showToast('Caches cleared', 'success', 2000);
+        runHealthCheck();
+      });
+    }
+
+    // Player selector buttons
+    $$('.player-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const color = btn.dataset.color;
+        if (color) {
+          assistedPlayerColor = color;
+          updatePlayerSelectorUI();
+          saveSettings();
+          showToast(`Coaching ${color === 'w' ? 'White' : 'Black'}`, 'info', 1500);
+          if (isPlayerTurn) requestAnalysis();
+        }
+      });
+      btn.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          const color = btn.dataset.color;
+          if (color) {
+            assistedPlayerColor = color;
+            updatePlayerSelectorUI();
+            saveSettings();
+            showToast(`Coaching ${color === 'w' ? 'White' : 'Black'}`, 'info', 1500);
+            if (isPlayerTurn) requestAnalysis();
+          }
+        }
+      });
+    });
+
+    // Style choices
+    $$('[data-style]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (isMaiaOnlyActive()) return;
+        const style = btn.dataset.style;
+        if (style) {
+          settings.style = normalizeStyle(style);
+          applySettingsToUI();
+          saveSettings();
+          updateStyleDescription();
+          updateEarlyKingHuntUI();
+          const styleNames = { normal: 'Normal', aggressive: 'Aggressive', super_ultra_aggressive: 'Ultra-Aggressive' };
+          showToast(`Style: ${styleNames[settings.style] || 'Normal'}`, 'info', 1500);
+          if (isPlayerTurn && currentFen) requestAnalysis();
+        }
+      });
+    });
+
+    // Human-like mode
+    $$('.human-mode-opt').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (isMaiaOnlyActive()) return;
+        const mode = btn.dataset.mode;
+        settings.humanLikeMode = mode === 'on';
+        applySettingsToUI();
+        saveSettings();
+        showToast(settings.humanLikeMode ? 'Human-like mode ON' : 'Human-like mode OFF', 'info', 1500);
+        if (isPlayerTurn && currentFen) requestAnalysis();
+      });
+    });
+
+    // Sparring strength slider
+    const sparringInput = document.getElementById('setting-sparring-strength');
+    if (sparringInput) {
+      sparringInput.addEventListener('input', (e) => {
+        const v = Number.isFinite(Number(e.target.value)) ? Number(e.target.value) : 1100;
+        settings.sparringStrength = Math.max(500, Math.min(3000, Math.round(v / 100) * 100));
+        const chip = document.getElementById('sparring-strength-value');
+        if (chip) chip.textContent = String(settings.sparringStrength);
+      });
+      sparringInput.addEventListener('change', () => {
+        saveSettings();
+      });
+    }
+
+    // Maia rating slider
+    const maiaRatingInput = document.getElementById('setting-maia-rating');
+    if (maiaRatingInput) {
+      maiaRatingInput.addEventListener('input', (e) => {
+        const v = Number.isFinite(Number(e.target.value)) ? Number(e.target.value) : 1500;
+        settings.maiaRating = Math.max(600, Math.min(2600, Math.round(v / 100) * 100));
+        const chip = document.getElementById('maia-rating-value');
+        if (chip) chip.textContent = String(settings.maiaRating);
+      });
+      maiaRatingInput.addEventListener('change', () => {
+        saveSettings();
+        if (isMaiaOnlyActive() && isPlayerTurn && currentFen) requestAnalysis();
+      });
+    }
+
+    // Maia only toggle
+    const maiaOnlyInput = document.getElementById('setting-maia-only');
+    if (maiaOnlyInput) {
+      maiaOnlyInput.addEventListener('change', () => {
+        settings.maiaOnlyMode = maiaOnlyInput.checked;
+        applySettingsToUI();
+        saveSettings();
+        if (settings.maiaOnlyMode) {
+          showToast('Maia-only mode: other engines disabled', 'info', 2000);
+          if (isPlayerTurn && currentFen) requestAnalysis(true);
+        } else {
+          showToast('All engines re-enabled', 'info', 1500);
+          if (isPlayerTurn && currentFen) requestAnalysis(true);
+        }
+      });
+    }
+
+    // Checkbox settings that auto-save
+    ['setting-auto-analyze', 'setting-show-threats', 'setting-show-critical-moments',
+     'setting-use-chess-api', 'setting-use-lichess-cloud', 'setting-use-maia3',
+     'setting-use-masters-explorer', 'setting-early-king-hunt'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('change', () => {
+          switch (id) {
+            case 'setting-auto-analyze': settings.autoAnalyze = el.checked; break;
+            case 'setting-show-threats': settings.showThreats = el.checked; break;
+            case 'setting-show-critical-moments': settings.showCriticalMoments = el.checked; break;
+            case 'setting-use-chess-api': settings.useChessApi = el.checked; break;
+            case 'setting-use-lichess-cloud': settings.useLichessCloud = el.checked; break;
+            case 'setting-use-maia3': settings.useMaia3 = el.checked; break;
+            case 'setting-use-masters-explorer': settings.useMastersExplorer = el.checked; break;
+            case 'setting-early-king-hunt': settings.earlyKingHuntEnabled = el.checked; break;
+          }
+          saveSettings();
+          updateEngineGroups();
+          if (el.id === 'setting-early-king-hunt' || el.id.startsWith('setting-use-')) {
+            if (isPlayerTurn && currentFen) requestAnalysis(true);
+          }
+        });
+      }
+    });
+
+    // Select dropdowns
+    ['setting-analysis-quality', 'setting-candidate-lines'].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('change', () => {
+          if (id === 'setting-analysis-quality') settings.analysisQuality = el.value;
+          else settings.candidateLines = el.value;
+          saveSettings();
+          if (isPlayerTurn && currentFen) requestAnalysis();
+        });
+      }
+    });
+
+    chrome.runtime.onMessage.addListener(handleMessage);
+  }
+
+  // ─── Init ─────────────────────────────────────────────────────────
+  function init() {
+    loadSettings();
+    initKeyboardShortcuts();
+    initDialogFocusTrap();
+    initSettingsFocusTrap();
+    initMdSliders();
+    initSegmentedControls();
+    initScrollElevation();
+    bindEventHandlers();
+    stampVersion();
+    setBalanceEmptyState();
+    renderMoveClassificationEmpty();
+    if (dom.evalBar) dom.evalBar.setAttribute('role', 'slider');
+    startBoardReading();
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+  window.ChessPanel = {
+    showToast, openSettingsSheet, closeSettingsSheet, requestAnalysis,
+    runHealthCheck, loadSettings, applySettingsToUI, updatePlayerSelectorUI,
+    syncAllSegments, initSegmentedControls
+  };
 })();

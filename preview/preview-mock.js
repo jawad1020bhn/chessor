@@ -21,7 +21,7 @@
       fen,
       source: 'lichess-cloud',
       depth: 22,
-      stale: new URLSearchParams(location.search).has('stale'),
+      stale: false,
       confidence: 0.93,
       qualityClass: 'deep-engine',
       openingData: { opening: "Scholar's Mate Attack" },
@@ -61,12 +61,6 @@
         // Simulate provider latency, then push an analysis_update like background.js does
         await delay(600);
         const fen = message.fen || PREVIEW_FEN;
-        const params = new URLSearchParams(location.search);
-        if (params.has('loading')) return null;
-        if (params.has('error')) {
-          dispatch({ type: 'analysis_error', data: { fen, error: 'Analysis is unavailable. Try again shortly.' } });
-          return null;
-        }
         // A quieter first snapshot, then the mate net — the swing from
         // +0.4 to mate-in-1 classifies as a Blunder (the last move was
         // Black's Nf6, which allowed Qxf7#), and the Balance tile leans
