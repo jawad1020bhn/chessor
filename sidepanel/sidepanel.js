@@ -893,9 +893,14 @@
     dom.positionContext.classList.toggle('verified', verified);
     dom.positionContext.classList.toggle('partial', !positionReliable && turnReliable);
     dom.positionContext.classList.toggle('pending', !turnReliable);
+    // Context slot shows position facts, never the same words as the status
+    // text next to it (that read "Your turn  Your turn").
+    const fenParts = currentFen ? currentFen.split(' ') : [];
+    const moveNo = fenParts.length >= 6 ? parseInt(fenParts[5], 10) : NaN;
+    const sideToMove = fenParts[1] === 'b' ? 'Black to play' : 'White to play';
     dom.positionTurn.textContent = !turnReliable
       ? 'Waiting for a game'
-      : (isPlayerTurn ? 'Your turn' : 'Opponent turn');
+      : (Number.isFinite(moveNo) ? `Move ${moveNo} · ${sideToMove}` : sideToMove);
   }
 
   function syncWelcome() {
@@ -1069,6 +1074,7 @@
     if (!currentFen) return;
     updateEngineStatus('analyzing', refresh ? 'Refreshing...' : 'Analyzing...');
     setBalanceLoadingState(prevEval !== null);
+    if (!refresh) ensureHeroFallback();
     const colorToSend = assistedPlayerColor || playerColor || 'w';
     chrome.runtime.sendMessage({
       type: 'request_analysis',
@@ -1332,15 +1338,10 @@
       return;
     }
     const absPawns = Math.abs(score) / 100;
-    const sign = displayScore > 0 ? '+' : (displayScore < 0 ? '–' : '');
-    let text;
-    if (absPawns < 0.3) {
-      text = 'Dead equal position';
-    } else if (absPawns < 1) {
-      text = `${sign}${absPawns.toFixed(2)} pawn advantage — ${isWhite ? 'White' : 'Black'}`;
-    } else {
-      text = `${sign}${absPawns.toFixed(1)} pawns — ${isWhite ? 'White' : 'Black'}`;
-    }
+    const pawns = absPawns >= 1 ? absPawns.toFixed(1) : absPawns.toFixed(2).replace(/0$/, '');
+    const text = absPawns < 0.3
+      ? 'Dead equal position'
+      : (displayScore > 0 ? `You're up ${pawns} pawns` : `You're down ${pawns} pawns`);
     dom.evalDescription.textContent = text;
   }
 
@@ -1498,7 +1499,7 @@
         ? window.ChessHintEngine.detectAttackTags(uci, data.fen).isAttack
         : false;
       return `<li class="alt-row ${pieceWhite ? 'alt-row--white' : 'alt-row--black'}" role="listitem" style="--share: ${share}; --i: ${i}">
-        <span class="alt-row__piece" aria-hidden="true">${glyph}</span>
+        <span class="alt-row__piece ${pieceWhite ? 'pw' : 'pb'}" aria-hidden="true">${glyph}</span>
         <span class="alt-row__san">${h(san)}</span>
         <span class="alt-row__meter" role="progressbar" aria-valuenow="${share}" aria-valuemin="0" aria-valuemax="100" aria-label="Evaluation share ${share} of 100">
           <span class="alt-row__meter-fill"></span>
@@ -1565,7 +1566,23 @@
     }
     const bestUci = data.pvs && data.pvs[0] && data.pvs[0].pv ? data.pvs[0].pv[0] : null;
     setHeroAttackTag(bestUci, data.fen);
+    ensureHeroFallback();
   }
+
+  // The hero stage must never render as an empty tile (kicker + blank pill):
+  // if neither the lockup nor a message is visible, fall back to a status line.
+  function ensureHeroFallback() {
+    if (!dom.hintText || !dom.hintCard) return;
+    const warning = document.getElementById('fair-play-warning');
+    const lockupVisible = dom.hintFromTo && !dom.hintFromTo.hidden;
+    const textVisible = !dom.hintText.hidden && dom.hintText.textContent.trim() !== '';
+    const blocked = warning && !warning.hidden;
+    const welcomeVisible = dom.heroWelcome && !dom.heroWelcome.hidden;
+    if (lockupVisible || textVisible || blocked || welcomeVisible) return;
+    dom.hintText.hidden = false;
+    dom.hintText.textContent = 'Reading the position…';
+  }
+
 
   // ─── Move Lockup (§8.2 — piece glyph + from → to) ─────────────────
   const MOVE_FROMTO_PATTERN = /^(White|Black):\s*[^:]+:\s*([a-h][1-8])\s*→\s*([a-h][1-8])\s*$/;
@@ -1587,7 +1604,19 @@
       dom.lockupPiece.textContent = glyph;
       dom.lockupPiece.className = `piece-chip ${isWhitePiece ? 'pw' : 'pb'}`;
     }
-    if (dom.lockupSan) dom.lockupSan.textContent = san || '';
+    if (dom.lockupSan) {
+      let headline = (san || '').trim();
+      if (!headline) {
+        // Derive SAN from the recommended UCI, or degrade to the path text —
+        // the hero headline must never be blank.
+        const uci = lastEngineRecommendationUci;
+        headline = (uci && window.ChessHintEngine && typeof window.ChessHintEngine.uciToSan === 'function')
+          ? (window.ChessHintEngine.uciToSan(uci, fen) || '')
+          : '';
+        if (!headline) headline = `${lockup.from} → ${lockup.to}`;
+      }
+      dom.lockupSan.textContent = headline;
+    }
     if (dom.heroPath) dom.heroPath.textContent = `${lockup.from} → ${lockup.to}`;
     dom.hintFromTo.setAttribute('aria-label', `Move ${lockup.from} to ${lockup.to}`);
     dom.hintFromTo.classList.remove('swap');
