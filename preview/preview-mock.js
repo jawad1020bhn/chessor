@@ -41,11 +41,12 @@
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   async function route(message) {
+    const params = new URLSearchParams(location.search);
     switch (message && message.type) {
       case 'read_board':
         // ?noboard freezes the pre-game state so the hero welcome can be
         // inspected in isolation.
-        if (new URLSearchParams(location.search).has('noboard')) return {};
+        if (params.has('noboard')) return {};
         return {
           fen: PREVIEW_FEN,
           tabId: 'preview',
@@ -58,6 +59,21 @@
           timestamp: Date.now()
         };
       case 'request_analysis':
+        // ?loading keeps the request pending so the skeleton/balance
+        // loading state can be inspected. ?error answers with an
+        // analysis_error like background.js does on total provider failure.
+        if (params.has('loading')) {
+          await delay(30000);
+          return null;
+        }
+        if (params.has('error')) {
+          await delay(350);
+          dispatch({
+            type: 'analysis_error',
+            data: { error: 'Analysis is unavailable right now.', fen: message.fen || PREVIEW_FEN }
+          });
+          return null;
+        }
         // Simulate provider latency, then push an analysis_update like background.js does
         await delay(600);
         const fen = message.fen || PREVIEW_FEN;
@@ -80,10 +96,13 @@
           }
         });
         await delay(480);
-        // Append ?hold to freeze the quiet pass (alternatives visible,
-        // no mate yet) — handy for inspecting that state in isolation.
-        if (!new URLSearchParams(location.search).has('hold')) {
-          dispatch({ type: 'analysis_update', data: mockAnalysis(fen) });
+        // ?stale freezes on the mate result flagged as a cached (stale)
+        // response; ?hold freezes the quiet pass (alternatives visible,
+        // no mate yet) — handy for inspecting those states in isolation.
+        if (!params.has('hold')) {
+          const finalData = mockAnalysis(fen);
+          if (params.has('stale')) finalData.stale = true;
+          dispatch({ type: 'analysis_update', data: finalData });
         }
         return null;
       case 'health_check':
@@ -95,6 +114,7 @@
       case 'panel_state':
       case 'player_color_changed':
       case 'reset_correlation':
+      case 'clear_cache':
       case 'clear_caches':
       case 'record_human_recommendation':
         return null;
@@ -107,6 +127,7 @@
     runtime: {
       lastError: undefined,
       getURL: (value) => value,
+      getManifest: () => ({ version: '14.0.0', version_name: '14.0.0 (Felt → Flux)', name: 'Chess Hint Assistant' }),
       onMessage: { addListener: (fn) => listeners.push(fn) },
       sendMessage: (message, callback) => {
         const promise = route(message);

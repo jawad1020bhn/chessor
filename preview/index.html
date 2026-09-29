@@ -9,7 +9,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Felt — side panel preview</title>
+  <title>Flux — side panel preview</title>
   <link rel="stylesheet" href="../sidepanel/sidepanel.css">
   <style>
     html { background: #202a24; }
@@ -35,10 +35,38 @@
       border-radius: 999px;
       pointer-events: none;
     }
+    .preview-nav {
+      position: fixed;
+      right: 10px;
+      top: 10px;
+      z-index: 300;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .preview-nav a {
+      font: 600 10px/1.4 system-ui, sans-serif;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-decoration: none;
+      color: #cfe0d6;
+      background: rgba(0, 0, 0, 0.55);
+      padding: 5px 10px;
+      border-radius: 999px;
+    }
+    .preview-nav a[aria-current="page"] { color: #5ef2b8; }
   </style>
 </head>
 <body>
   <div id="panel-host" style="display:contents"><p style="padding:24px;font:500 13px system-ui">Loading panel…</p></div>
+  <nav class="preview-nav" aria-label="Preview scenarios">
+    <a href="/preview/" data-scenario="mate">Mate</a>
+    <a href="/preview/?hold" data-scenario="hold">Hold</a>
+    <a href="/preview/?noboard" data-scenario="noboard">No board</a>
+    <a href="/preview/?loading" data-scenario="loading">Loading</a>
+    <a href="/preview/?stale" data-scenario="stale">Stale</a>
+    <a href="/preview/?error" data-scenario="error">Error</a>
+  </nav>
   <span class="preview-tag">Dev preview · mock position (Scholar's mate net)</span>
 
   <script src="../engine/core-utils.js"></script>
@@ -50,6 +78,16 @@
   <script src="../engine/hint-engine.js"></script>
   <script src="preview-mock.js"></script>
   <script>
+    // Mark the active scenario link.
+    const scenario = new URLSearchParams(location.search).has('noboard') ? 'noboard'
+      : new URLSearchParams(location.search).has('hold') ? 'hold'
+      : new URLSearchParams(location.search).has('loading') ? 'loading'
+      : new URLSearchParams(location.search).has('stale') ? 'stale'
+      : new URLSearchParams(location.search).has('error') ? 'error'
+      : 'mate';
+    const activeLink = document.querySelector(`[data-scenario="${scenario}"]`);
+    if (activeLink) activeLink.setAttribute('aria-current', 'page');
+
     (async function () {
       // Pull the real panel markup so the preview can never drift from it.
       const html = await (await fetch('../sidepanel/sidepanel.html')).text();

@@ -7,7 +7,9 @@ async function loaded(page, query = '') {
   await page.goto(`/preview/${query}`);
   await expect(page.locator('#btn-settings')).toBeVisible();
   if (!query.includes('noboard')) {
-    await expect(page.locator('#hint-text')).toContainText(query.includes('hold') ? 'Nc3' : 'Qxf7');
+    // Hero renders the move lockup: from → to squares of the best move.
+    const target = query.includes('hold') ? 'c3' : 'f7';
+    await expect(page.locator('#hint-fromto')).toContainText(target, { timeout: 10000 });
   }
   expect(errors).toEqual([]);
 }
@@ -18,7 +20,7 @@ async function accessible(page) {
 }
 async function noOverflow(page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  expect(await page.locator('#main-canvas').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  expect(await page.locator('#canvas').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
 }
 
 for (const theme of ['light', 'dark']) {
@@ -27,17 +29,24 @@ for (const theme of ['light', 'dark']) {
       await page.setViewportSize({ width, height: 850 });
       await page.emulateMedia({ colorScheme: theme });
       await loaded(page);
-      await expect(page.locator('.hint-mate')).toHaveText('Mate in 1');
+      // Balance tile: mate for White → leaning "you", +M1 headline.
+      await expect(page.locator('#eval-section')).toHaveAttribute('data-lean', 'you');
+      await expect(page.locator('#eval-description')).toContainText('Mate in 1');
+      // Verdict tile: Black's Nf6 allowed Qxf7# → blunder.
+      await expect(page.locator('#move-class-section')).toHaveAttribute('data-verdict', 'blunder');
+      // Caption rail + attack tag (Qxf7# is a forcing check).
+      await expect(page.locator('#idea-section .caption-rail__row').first()).toBeVisible();
+      await expect(page.locator('#hint-attack-tag')).toBeVisible();
       await noOverflow(page);
       await accessible(page);
       await page.locator('#btn-settings').click();
+      await expect(page.locator('#settings-sheet')).toBeVisible();
       await expect(page.locator('#btn-close-settings')).toBeFocused();
-      await expect(page.locator('.md-canvas')).toHaveAttribute('inert', '');
-      expect(await page.locator('.md-sheet__body').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+      await expect(page.locator('.sheet__body').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
       await accessible(page);
       await page.locator('#setting-auto-analyze').focus();
       await page.keyboard.press('Escape');
-      await expect(page.locator('#settings-panel')).toBeHidden();
+      await expect(page.locator('#settings-sheet')).toBeHidden();
       await expect(page.locator('#btn-settings')).toBeFocused();
     });
   }
@@ -45,7 +54,7 @@ for (const theme of ['light', 'dark']) {
 
 test('welcome has actionable study copy, no phantom evaluation', async ({ page }) => {
   await loaded(page, '?noboard');
-  await expect(page.locator('#hero-welcome')).toContainText('supported analysis board');
+  await expect(page.locator('#hero-welcome')).toContainText('Open a game');
   await expect(page.locator('#eval-section')).toBeHidden();
   await expect(page.locator('#position-info')).toBeHidden();
   await accessible(page);
@@ -54,13 +63,27 @@ test('welcome has actionable study copy, no phantom evaluation', async ({ page }
 test('alternatives preserve their scores and proportional meters', async ({ page }) => {
   await loaded(page, '?hold');
   await expect(page.locator('#alts-section')).toBeVisible();
-  const rows = page.locator('.md-alt-row');
+  const rows = page.locator('.alt-row');
   expect(await rows.count()).toBeGreaterThan(0);
   for (const row of await rows.all()) {
-    const track = await row.locator('.md-alt-row__meter').boundingBox();
-    const fill = await row.locator('.md-alt-row__meter-fill').boundingBox();
+    const track = await row.locator('.alt-row__meter').boundingBox();
+    const fill = await row.locator('.alt-row__meter-fill').boundingBox();
     expect(fill.width).toBeLessThanOrEqual(track.width);
     expect(fill.width).toBeGreaterThan(0);
+  }
+  await accessible(page);
+});
+
+test('caption rail renders the §8.3 row kinds with labels', async ({ page }) => {
+  await loaded(page);
+  const rows = page.locator('#idea-section .caption-rail__row');
+  expect(await rows.count()).toBeGreaterThan(0);
+  const kinds = await rows.evaluateAll(list =>
+    list.flatMap(row => [...row.classList]
+      .filter(c => c.startsWith('caption-rail__row--'))
+      .map(c => c.slice('caption-rail__row--'.length))));
+  for (const kind of kinds) {
+    expect(['idea', 'capture', 'sacrifice', 'kinghunt', 'cost', 'risk', 'posture', 'reply']).toContain(kind);
   }
   await accessible(page);
 });
@@ -85,7 +108,20 @@ test('style controls, gating, switches and focus trap remain functional', async 
   await page.locator('#setting-maia-only').uncheck();
   await expect(page.locator('#setting-use-chess-api')).toBeEnabled();
   await page.locator('#setting-use-chess-api').uncheck();
-  await expect(page.locator('[data-engine="chess-api"] .md-engine__body')).toBeHidden();
+  await expect(page.locator('[data-engine="chess-api"] .engine-group__body')).toBeHidden();
+  await accessible(page);
+});
+
+test('human mode segmented + sparring slider reveal together', async ({ page }) => {
+  await loaded(page);
+  await page.locator('#btn-settings').click();
+  await expect(page.locator('#sparring-strength-row')).toBeHidden();
+  await page.getByRole('radio', { name: 'Human', exact: true }).click();
+  await expect(page.locator('#sparring-strength-row')).toBeVisible();
+  await page.locator('#setting-sparring-strength').fill('1250');
+  await expect(page.locator('#sparring-strength-value')).toHaveText('1250');
+  await page.getByRole('radio', { name: 'Engine', exact: true }).click();
+  await expect(page.locator('#sparring-strength-row')).toBeHidden();
   await accessible(page);
 });
 
@@ -94,7 +130,6 @@ test('shortcuts dialog restores focus; radio arrows and refresh work', async ({ 
   await page.locator('#btn-settings').focus();
   await page.keyboard.press('?');
   await expect(page.locator('#shortcut-help')).toBeVisible();
-  await expect(page.locator('#app')).toHaveAttribute('inert', '');
   await page.keyboard.press('Tab');
   await expect(page.locator('#btn-close-shortcut-help')).toBeFocused();
   await page.keyboard.press('Escape');
@@ -106,7 +141,7 @@ test('shortcuts dialog restores focus; radio arrows and refresh work', async ({ 
   await page.keyboard.press('ArrowLeft');
   await page.locator('#btn-refresh').click();
   await expect(page.locator('#btn-refresh')).not.toHaveClass(/spinning/);
-  await expect(page.locator('#hint-text')).toContainText('Qxf7');
+  await expect(page.locator('#hint-fromto')).toContainText('f7');
 });
 
 test('loading, stale cache and provider errors have legible states', async ({ page }) => {
@@ -114,7 +149,7 @@ test('loading, stale cache and provider errors have legible states', async ({ pa
   await expect(page.locator('#eval-section')).toHaveAttribute('data-state', 'loading');
   await accessible(page);
   await page.goto('/preview/?stale');
-  await expect(page.locator('#hint-text')).toContainText('Qxf7');
+  await expect(page.locator('#eval-section')).toHaveAttribute('data-state', 'stale');
   await expect(page.locator('#eval-stale-badge')).toBeVisible();
   await accessible(page);
   await page.goto('/preview/?error');

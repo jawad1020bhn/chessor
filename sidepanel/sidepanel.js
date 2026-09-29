@@ -328,6 +328,13 @@
 
   function initKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
+      // Escape closes overlays even when focus sits in a form field; the
+      // other shortcuts must not hijack typing.
+      if (e.key === 'Escape') {
+        if (shortcutHelpVisible) { closeShortcuts(); }
+        else if (dom.settingsSheet && !dom.settingsSheet.hidden) { closeSettingsSheet(); }
+        return;
+      }
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
       const key = e.key.toLowerCase();
       switch (key) {
@@ -345,10 +352,6 @@
             openSettingsSheet();
           }
           break;
-        case 'escape':
-          if (shortcutHelpVisible) { closeShortcuts(); }
-          else if (dom.settingsSheet && !dom.settingsSheet.hidden) { closeSettingsSheet(); }
-          break;
         case '?':
           e.preventDefault();
           if (shortcutHelpVisible) closeShortcuts();
@@ -358,13 +361,26 @@
     });
   }
 
+  // Fixed-position overlays report offsetParent === null even while
+  // visible, so visibility is checked with checkVisibility() (fallback:
+  // not hidden + non-zero rect).
+  function isVisible(el) {
+    if (!el) return false;
+    if (typeof el.checkVisibility === 'function') {
+      return el.checkVisibility({ checkVisibilityCSS: true });
+    }
+    if (el.hidden) return false;
+    const rect = el.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+
   function initDialogFocusTrap() {
     if (!shortcutDialog) return;
     const FOCUSABLE = 'button, [href], [tabindex]:not([tabindex="-1"])';
     shortcutDialog.addEventListener('keydown', (e) => {
       if (e.key !== 'Tab') return;
       const focusables = Array.from(shortcutDialog.querySelectorAll(FOCUSABLE))
-        .filter((el) => el.offsetParent !== null);
+        .filter((el) => isVisible(el));
       if (focusables.length === 0) return;
       const first = focusables[0];
       const last = focusables[focusables.length - 1];
@@ -374,13 +390,16 @@
         e.preventDefault(); first.focus();
       }
     });
+    // Scrim click dismisses (pointer parity with the Esc shortcut).
+    const scrim = shortcutDialog.querySelector('.dialog__scrim');
+    if (scrim) scrim.addEventListener('click', closeShortcuts);
   }
 
   function initSettingsFocusTrap() {
     if (!dom.settingsSheet) return;
     const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
     const getFocusable = () => Array.from(dom.settingsSheet.querySelectorAll(FOCUSABLE))
-      .filter(el => el.offsetParent !== null && !el.disabled);
+      .filter(el => !el.disabled && isVisible(el));
     dom.settingsSheet.addEventListener('keydown', (e) => {
       if (e.key !== 'Tab') return;
       const focusable = getFocusable();
@@ -394,15 +413,16 @@
       }
     });
     const observer = new MutationObserver(() => {
-      const isVisible = !dom.settingsSheet.hidden;
-      if (isVisible) {
+      const sheetVisible = !dom.settingsSheet.hidden;
+      if (sheetVisible) {
         const focusable = getFocusable();
         if (focusable.length > 0 && !dom.settingsSheet.contains(document.activeElement)) {
           focusable[0].focus();
         }
       }
     });
-    observer.observe(dom.settingsSheet, { attributes: true, attributeFilter: ['style'] });
+    // Visibility toggles via the `hidden` attribute and the closing class.
+    observer.observe(dom.settingsSheet, { attributes: true, attributeFilter: ['hidden', 'style', 'class'] });
   }
 
   // ─── Move Inference ────────────────────────────────────────────────
@@ -523,6 +543,51 @@
     ]);
   }
 
+  // ─── Expressive setting controls (§9.1/§9.2) ───────────────────────
+  // Segmented items and choice cards carry data-expressive-setting="<id>"
+  // + data-value; this maps each control id onto its settings key.
+  const EXPRESSIVE_SETTING_KEYS = {
+    'setting-analysis-quality': 'analysisQuality',
+    'setting-candidate-lines': 'candidateLines',
+    'setting-style': 'style',
+    'setting-maia-lines': 'maiaCandidateLines',
+    'setting-human-like-mode': 'humanLikeMode'
+  };
+
+  function applyExpressiveSetting(settingId, value) {
+    const key = EXPRESSIVE_SETTING_KEYS[settingId];
+    if (!key) return;
+    if (settingId === 'setting-human-like-mode') {
+      const next = value === 'on';
+      if (next === settings.humanLikeMode) return;
+      settings.humanLikeMode = next;
+      applySettingsToUI();
+      saveSettings();
+      showToast(next ? 'Human-like mode ON' : 'Human-like mode OFF', 'info', 1500);
+    } else {
+      settings[key] = value;
+      applySettingsToUI();
+      saveSettings();
+      if (settingId === 'setting-style') {
+        const styleNames = { normal: 'Normal', aggressive: 'Aggressive', super_ultra_aggressive: 'Ultra attack' };
+        showToast(`Style: ${styleNames[settings.style] || 'Normal'}`, 'info', 1500);
+      }
+    }
+    if (isPlayerTurn && currentFen) requestAnalysis();
+  }
+
+  function syncExpressiveControls() {
+    $$('[data-expressive-setting]').forEach((item) => {
+      const key = EXPRESSIVE_SETTING_KEYS[item.dataset.expressiveSetting];
+      if (!key) return;
+      let current = settings[key];
+      if (item.dataset.expressiveSetting === 'setting-human-like-mode') {
+        current = current ? 'on' : 'off';
+      }
+      item.setAttribute('aria-checked', String(item.dataset.value) === String(current) ? 'true' : 'false');
+    });
+  }
+
   function applySettingsToUI() {
     const mapping = {
       'setting-analysis-quality': settings.analysisQuality,
@@ -548,6 +613,7 @@
       if (el.type === 'checkbox') el.checked = val;
       else el.value = val;
     });
+    syncExpressiveControls();
     const humanStatus = document.querySelector('.human-mode-status');
     if (humanStatus) humanStatus.textContent = settings.humanLikeMode ? 'On' : 'Off';
     const strengthRow = document.getElementById('sparring-strength-row');
@@ -560,16 +626,15 @@
     if (maiaRatingOutput) maiaRatingOutput.textContent = String(settings.maiaRating);
     updateEngineGroups();
     updateMaiaOnlyUI();
-    $$('.human-mode-opt').forEach(btn => {
-      const active = (btn.dataset.mode === 'on') === settings.humanLikeMode;
-      btn.setAttribute('aria-checked', active ? 'true' : 'false');
-    });
     updateStyleDescription();
     updateEarlyKingHuntUI();
-    syncAllSegments();
+    syncAllSliders();
+    updateHeroWash();
   }
 
-  // ─── Sliders ───────────────────────────────────────────────────────
+  // ─── Sliders (§9.4) ────────────────────────────────────────────────
+  const sliderRenderers = [];
+
   function initMdSliders() {
     $$('[data-md-slider]').forEach((slider) => {
       const input = slider.querySelector('input[type="range"]');
@@ -585,7 +650,8 @@
       };
       let bumpTimer = null;
       const bumpChip = () => {
-        const chip = document.getElementById('sparring-strength-value');
+        // Bump this slider's own value chip (springs on change, §9.4).
+        const chip = slider.closest('.slider-row')?.querySelector('.slider-row__value');
         if (!chip) return;
         chip.classList.add('is-bumped');
         clearTimeout(bumpTimer);
@@ -594,52 +660,71 @@
       input.addEventListener('input', () => { render(); bumpChip(); });
       input.addEventListener('pointerdown', () => slider.classList.add('is-dragging'));
       window.addEventListener('pointerup', () => slider.classList.remove('is-dragging'));
+      sliderRenderers.push(render);
       render();
     });
   }
 
-  // ─── Segmented Controls ───────────────────────────────────────────
-  const segmentedGroups = [];
-
-  function layoutSegmented(group) {
-    if (!group) return;
-    const selected = group.querySelector('[aria-checked="true"]');
-    if (!selected) {
-      group.classList.remove('is-ready');
-      return;
-    }
-    if (group.offsetWidth === 0 || selected.offsetWidth === 0) {
-      group.classList.remove('is-ready');
-      return;
-    }
-    group.style.setProperty('--seg-x', `${selected.offsetLeft}px`);
-    group.style.setProperty('--seg-y', `${selected.offsetTop}px`);
-    group.style.setProperty('--seg-w', `${selected.offsetWidth}px`);
-    group.style.setProperty('--seg-h', `${selected.offsetHeight}px`);
-    group.classList.add('is-ready');
+  function syncAllSliders() {
+    sliderRenderers.forEach((render) => render());
   }
 
+  // ─── Segmented / radiogroup controls (§9.1 — M3 Expressive) ────────
+  // The sliding indicator is retired: selection morphs the item itself
+  // fully round. Interactions are click-to-select plus APG arrow-key
+  // roving (selection follows focus).
+  const radiogroups = [];
+
   function syncAllSegments() {
-    segmentedGroups.forEach(layoutSegmented);
+    // Kept for API compatibility; radiogroups no longer need geometry
+    // syncing without a sliding indicator.
+  }
+
+  function selectRadio(item) {
+    if (!item || item.disabled || item.getAttribute('aria-disabled') === 'true') return;
+    const group = item.closest('[role="radiogroup"]');
+    if (!group) return;
+    group.querySelectorAll('[role="radio"]').forEach((other) => {
+      other.setAttribute('aria-checked', other === item ? 'true' : 'false');
+    });
+    const settingId = item.dataset.expressiveSetting || item.dataset.expressive_setting;
+    if (settingId && item.dataset.value !== undefined) {
+      applyExpressiveSetting(settingId, item.dataset.value);
+    }
+  }
+
+  function roveRadiogroup(group, current, delta) {
+    const items = [...group.querySelectorAll('[role="radio"]')]
+      .filter((el) => !el.disabled && el.getAttribute('aria-disabled') !== 'true');
+    if (items.length === 0) return;
+    const index = items.indexOf(current);
+    const next = items[(index + delta + items.length) % items.length];
+    next.focus();
+    selectRadio(next);
   }
 
   function initSegmentedControls() {
-    $$('.segmented[role="radiogroup"]').forEach((group) => {
-      if (!group.querySelector('.segmented__indicator')) {
-        const indicator = document.createElement('span');
-        indicator.className = 'segmented__indicator';
-        indicator.setAttribute('aria-hidden', 'true');
-        group.prepend(indicator);
-      }
-      segmentedGroups.push(group);
-      if (typeof ResizeObserver === 'function') {
-        new ResizeObserver(() => layoutSegmented(group)).observe(group);
-      }
+    $$('[role="radiogroup"]').forEach((group) => {
+      radiogroups.push(group);
+      group.addEventListener('click', (e) => {
+        const item = e.target.closest('[role="radio"]');
+        if (!item || !group.contains(item)) return;
+        // Player selector has its own dedicated click handler.
+        if (item.classList.contains('player-btn')) return;
+        e.preventDefault();
+        selectRadio(item);
+      });
+      group.addEventListener('keydown', (e) => {
+        const current = e.target.closest('[role="radio"]');
+        if (!current || !group.contains(current)) return;
+        const horizontal = ['ArrowRight', 'ArrowLeft'].includes(e.key);
+        const vertical = ['ArrowDown', 'ArrowUp'].includes(e.key);
+        if (!horizontal && !vertical) return;
+        e.preventDefault();
+        const forward = e.key === 'ArrowRight' || e.key === 'ArrowDown';
+        roveRadiogroup(group, current, forward ? 1 : -1);
+      });
     });
-    if (document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(() => syncAllSegments()).catch(() => {});
-    }
-    requestAnimationFrame(syncAllSegments);
   }
 
   // ─── Player Selector ──────────────────────────────────────────────
@@ -661,7 +746,7 @@
     if (settingsSheetCloseTimer) clearTimeout(settingsSheetCloseTimer);
     dom.settingsSheet.classList.remove('sheet--closing');
     dom.settingsSheet.hidden = false;
-    requestAnimationFrame(() => requestAnimationFrame(syncAllSegments));
+    syncAllSliders();
     runHealthCheck();
   }
 
@@ -673,6 +758,10 @@
         dom.settingsSheet.hidden = true;
         dom.settingsSheet.classList.remove('sheet--closing');
         settingsSheetCloseTimer = null;
+        // Return focus to the invoking control (§10 keyboard operability).
+        if (dom.settingsSheet.contains(document.activeElement) && dom.btnSettings) {
+          dom.btnSettings.focus();
+        }
       }, REDUCED_MOTION ? 0 : 210);
     }
   }
@@ -1074,10 +1163,28 @@
       updateEvalDescription(bestPV.score, bestPV.scoreType, effectiveColor);
     }
 
+    // Fair-play block: the hero drops into the error wash (§8.2) with the
+    // warning text — no move lockup, no rails, no recommendation.
+    const warning = document.getElementById('fair-play-warning');
+    if (data.exactHintBlocked) {
+      if (dom.hintCard) dom.hintCard.classList.add('blocked');
+      if (dom.hintText) dom.hintText.textContent = '';
+      if (dom.hintFromTo) { dom.hintFromTo.style.display = 'none'; dom.hintFromTo.replaceChildren(); }
+      if (dom.hintAttackTag) dom.hintAttackTag.hidden = true;
+      if (dom.altsSection) dom.altsSection.hidden = true;
+      hideIdeaRail();
+      if (warning) {
+        const text = document.getElementById('fair-play-warning-text');
+        if (text) text.textContent = data.exactHintBlocked.message || 'Exact hints unavailable for this position.';
+        warning.style.display = '';
+      }
+      return;
+    }
+    if (dom.hintCard) dom.hintCard.classList.remove('blocked');
+    if (warning) warning.style.display = 'none';
+
     renderPositionInfo(viewData);
     renderHints(viewData);
-
-    if (data.exactHintBlocked) return;
 
     if (settings.showCriticalMoments) {
       renderCriticalMoment(effectiveColor);
@@ -1107,7 +1214,7 @@
 
     if (dom.evalBar) {
       const evalPawns = scoreType === 'mate'
-        ? (displayScore > 0 ? 10 : -10) * Math.sign(displayScore || 1)
+        ? (displayScore > 0 ? 10 : -10)
         : score / 100;
       const pct = Math.round(whiteWinPct);
       dom.evalBar.setAttribute('aria-valuenow', String(Math.max(-10, Math.min(10, evalPawns))));
@@ -1195,6 +1302,24 @@
   }
 
   // ─── Position Info ─────────────────────────────────────────────────
+  const MATERIAL_VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+
+  function computeMaterialBalance(fen) {
+    if (!fen || !window.ChessCore || typeof window.ChessCore.parsePlacement !== 'function') return null;
+    const board = window.ChessCore.parsePlacement(fen.split(' ')[0]);
+    if (!board) return null;
+    let diff = 0;
+    for (const row of board) {
+      for (const piece of row) {
+        if (!piece) continue;
+        const value = MATERIAL_VALUES[piece.toLowerCase()] || 0;
+        diff += piece === piece.toUpperCase() ? value : -value;
+      }
+    }
+    if (diff === 0) return 'Equal';
+    return diff > 0 ? `You +${diff}` : `Opp +${Math.abs(diff)}`;
+  }
+
   function renderPositionInfo(data) {
     if (dom.openingName && data.openingData && data.openingData.opening) {
       dom.openingName.textContent = data.openingData.opening;
@@ -1202,8 +1327,8 @@
       dom.openingName.textContent = '—';
     }
     if (dom.gamePhase && data.gamePhase) dom.gamePhase.textContent = data.gamePhase;
-    if (dom.materialBalance && window.ChessHintEngine && typeof window.ChessHintEngine.materialBalance === 'function') {
-      dom.materialBalance.textContent = window.ChessHintEngine.materialBalance(data.fen);
+    if (dom.materialBalance) {
+      dom.materialBalance.textContent = computeMaterialBalance(data.fen) || 'Equal';
     }
     if (dom.analysisQuality && data.analysisParams && data.analysisParams.quality) {
       dom.analysisQuality.textContent = data.analysisParams.quality;
@@ -1213,70 +1338,93 @@
     }
   }
 
-  // ─── Critical Moment ──────────────────────────────────────────────
+  // ─── Critical Moment (§8.5) ───────────────────────────────────────
   function renderCriticalMoment(effectiveColor) {
     if (!dom.criticalMomentSection || !dom.criticalMomentText || !dom.criticalMomentDetail) return;
-    if (!window.ChessHintEngine || typeof window.ChessHintEngine.analyzeCriticalMoment !== 'function') {
+    const engine = window.ChessHintEngine;
+    if (!engine || typeof engine.detectCriticalMoment !== 'function') {
       dom.criticalMomentSection.hidden = true;
       return;
     }
-    const result = window.ChessHintEngine.analyzeCriticalMoment({
-      lastAnalysis,
-      isPlayerTurn,
-      playerColor: effectiveColor,
-      evalHistory,
-      prevEval
-    });
-    if (!result || !result.isCritical) {
+    // evalHistory already stores scores from the assisted player's
+    // perspective; the last entry is the fresh evaluation.
+    const latest = evalHistory[evalHistory.length - 1];
+    if (!latest) {
+      dom.criticalMomentSection.hidden = true;
+      lastCriticalAlert = null;
+      return;
+    }
+    const alert = engine.detectCriticalMoment(
+      evalHistory, latest.score, latest.scoreType || 'cp', effectiveColor
+    );
+    if (!alert) {
       dom.criticalMomentSection.hidden = true;
       lastCriticalAlert = null;
       return;
     }
     dom.criticalMomentSection.hidden = false;
-    dom.criticalMomentText.textContent = result.title || 'Critical moment';
-    dom.criticalMomentDetail.textContent = result.detail || '';
-    dom.criticalMomentSection.dataset.severity = result.severity || 'moderate';
-
-    if (lastCriticalAlert !== result.title || true) {
-      if (!lastCriticalAlert) {
-        showToast(result.title, 'warning', 4000);
-      }
-      lastCriticalAlert = result.title;
+    dom.criticalMomentText.textContent = alert.message || 'Critical moment';
+    dom.criticalMomentDetail.textContent = alert.detail || '';
+    dom.criticalMomentSection.dataset.severity = alert.severity || 'moderate';
+    if (!lastCriticalAlert) {
+      showToast(alert.message || 'Critical moment', 'warning', 4000);
     }
+    lastCriticalAlert = alert.message || 'Critical moment';
   }
 
-  // ─── Idea Rail ────────────────────────────────────────────────────
+  // ─── Caption Rail (§8.3 — Why this move) ──────────────────────────
+  // Row kinds → icon + color roles are pure CSS (mask-based icons keyed by
+  // the `caption-rail__row--<kind>` class); JS only emits semantic markup.
+  const CAPTION_KINDS = ['idea', 'capture', 'sacrifice', 'kinghunt', 'cost', 'risk', 'posture', 'reply'];
+  const CAPTION_FALLBACK_LABELS = {
+    idea: 'Key idea', capture: 'Captures', sacrifice: 'Sacrifice', kinghunt: 'King hunt',
+    cost: 'Cost', risk: 'Risk', posture: 'Position', reply: 'Best reply'
+  };
+
   function renderIdeaRail(captions) {
     if (!dom.ideaSection || !dom.ideaList) return;
-    if (!captions || captions.length === 0) {
+    const rows = (Array.isArray(captions) ? captions : [])
+      .filter((caption) => caption && (caption.text || caption.label))
+      .slice(0, 6);
+    if (rows.length === 0) {
       hideIdeaRail();
       return;
     }
-    const items = captions.map((caption) => {
-      const kind = caption.kind || 'reply';
-      const label = caption.label || '';
+    dom.ideaList.innerHTML = rows.map((caption, i) => {
+      const kind = CAPTION_KINDS.includes(caption.kind) ? caption.kind : 'posture';
+      const label = caption.label || CAPTION_FALLBACK_LABELS[kind];
       const text = caption.text || '';
-      const svgIcon = kind === 'reply' ? '⤻' : (kind === 'threat' ? '⚡' : '→');
-      return `<li class="idea-item idea-item--${kind}">
-        <span class="idea-icon" aria-hidden="true">${svgIcon}</span>
-        <span class="idea-label">${h(label)}</span>
-        <span class="idea-text">${h(text)}</span>
+      return `<li class="caption-rail__row caption-rail__row--${kind}" role="listitem" style="--i: ${i}">
+        <span class="caption-rail__icon" aria-hidden="true"></span>
+        <span class="caption-rail__texts">
+          <span class="caption-rail__label">${h(label)}</span>
+          <span class="caption-rail__body">${h(text)}</span>
+        </span>
       </li>`;
     }).join('');
-    dom.ideaList.innerHTML = items;
     dom.ideaSection.hidden = false;
-    dom.ideaSection.classList.add('fade-in');
-    setTimeout(() => dom.ideaSection.classList.remove('fade-in'), 300);
   }
 
   function hideIdeaRail() {
     if (dom.ideaSection) {
       dom.ideaSection.hidden = true;
-      dom.ideaSection.classList.remove('fade-in');
+      dom.ideaList.replaceChildren();
     }
   }
 
-  // ─── Alternatives ──────────────────────────────────────────────────
+  // ─── Alternatives (§8.8 — Also consider) ──────────────────────────
+  const PIECE_GLYPHS = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
+
+  function pieceAtSquare(fen, square) {
+    if (!fen || !square || !window.ChessCore || typeof window.ChessCore.parsePlacement !== 'function') return null;
+    const board = window.ChessCore.parsePlacement(fen.split(' ')[0]);
+    if (!board) return null;
+    const col = square.charCodeAt(0) - 97;
+    const row = 8 - parseInt(square[1], 10);
+    if (row < 0 || row > 7 || col < 0 || col > 7) return null;
+    return board[row][col] || null;
+  }
+
   function renderAlternatives(data) {
     if (!dom.altsSection || !dom.altsList) return;
     if (!data.pvs || data.pvs.length <= 1) {
@@ -1285,18 +1433,35 @@
     }
     const alts = data.pvs.slice(1, 4);
     if (alts.length === 0) { dom.altsSection.hidden = true; return; }
+    const effectiveColor = assistedPlayerColor || playerColor || 'w';
     dom.altsList.innerHTML = alts.map((pv, i) => {
       const scoreStr = pv.scoreType === 'mate'
         ? (pv.score >= 0 ? `+M${pv.score}` : `-M${Math.abs(pv.score)}`)
-        : `${(pv.score / 100).toFixed(2)}`;
+        : `${pv.score >= 0 ? '+' : ''}${(pv.score / 100).toFixed(2)}`;
+      const isMate = pv.scoreType === 'mate';
       const uci = pv.pv && pv.pv[0];
       const san = uci && window.ChessHintEngine && window.ChessHintEngine.uciToSan
         ? window.ChessHintEngine.uciToSan(uci, data.fen)
         : (uci || '–');
-      return `<li class="alt-item">
-        <span class="alt-rank">${i + 2}</span>
-        <span class="alt-move">${h(san)}</span>
-        <span class="alt-score">${h(scoreStr)}</span>
+      // Physical piece chip: glyph from the board, colors theme-invariant (§2.3).
+      const pieceChar = uci ? pieceAtSquare(data.fen, uci.substring(0, 2)) : null;
+      const glyph = pieceChar ? (PIECE_GLYPHS[pieceChar.toLowerCase()] || '♟') : '♟';
+      const pieceWhite = pieceChar ? pieceChar === pieceChar.toUpperCase() : effectiveColor === 'w';
+      // Share of the evaluation, as a progressbar (aria per §10).
+      const share = Math.round(window.ChessHintEngine && window.ChessHintEngine.formatEvalBar
+        ? window.ChessHintEngine.formatEvalBar(pv.score, pv.scoreType, effectiveColor === 'w')
+        : 50);
+      const isAttack = uci && window.ChessHintEngine && typeof window.ChessHintEngine.detectAttackTags === 'function'
+        ? window.ChessHintEngine.detectAttackTags(uci, data.fen).isAttack
+        : false;
+      return `<li class="alt-row ${pieceWhite ? 'alt-row--white' : 'alt-row--black'}" role="listitem" style="--share: ${share}; --i: ${i}">
+        <span class="alt-row__piece" aria-hidden="true">${glyph}</span>
+        <span class="alt-row__san">${h(san)}</span>
+        <span class="alt-row__meter" role="progressbar" aria-valuenow="${share}" aria-valuemin="0" aria-valuemax="100" aria-label="Evaluation share ${share} of 100">
+          <span class="alt-row__meter-fill"></span>
+        </span>
+        <span class="alt-row__score${isMate ? ' is-mate' : ''}">${h(scoreStr)}</span>
+        <span class="alt-row__tag"${isAttack ? '' : ' hidden'}>Attack</span>
       </li>`;
     }).join('');
     dom.altsSection.hidden = false;
@@ -1319,8 +1484,12 @@
         formSession: settings.humanLikeMode ? (data.formSession || null) : null
       }
     );
+    // The engine's from→to field is a display string: either a move lockup
+    // ("White: knight: g1 → f3") or a waiting sentence. Only a real move
+    // renders the lockup; anything else falls back to the hero text.
+    const lockup = parseMoveLockup(hints.bestMoveFromTo);
     if (dom.hintText) {
-      if (hints.bestMoveFromTo) {
+      if (lockup) {
         dom.hintText.textContent = '';
         dom.hintText.classList.remove('fade-in');
       } else {
@@ -1344,60 +1513,73 @@
     renderAlternatives(data);
 
     if (dom.hintFromTo) {
-      if (hints.bestMoveFromTo) {
+      if (lockup) {
         dom.hintFromTo.style.display = '';
-        renderFromTo(hints.bestMoveFromTo);
+        renderMoveLockup(lockup, data.fen);
       } else {
         dom.hintFromTo.style.display = 'none';
+        dom.hintFromTo.replaceChildren();
       }
     }
-    setHeroAttackTag(data.pvs && data.pvs[0] && data.pvs[0].pv ? data.pvs[0].pv[0] : null, data.fen);
+    const bestUci = data.pvs && data.pvs[0] && data.pvs[0].pv ? data.pvs[0].pv[0] : null;
+    setHeroAttackTag(bestUci, data.fen);
   }
 
-  // ─── FromTo Hero ──────────────────────────────────────────────────
-  const SQUARE_SVG = {};
-  function renderFromTo(bestMoveFromTo) {
-    if (!dom.hintFromTo) return;
-    const { from, to } = bestMoveFromTo;
-    const fromSquare = typeof from === 'string' ? from : `${String.fromCharCode(97 + from.c)}${8 - from.r}`;
-    const toSquare = typeof to === 'string' ? to : `${String.fromCharCode(97 + to.c)}${8 - to.r}`;
-    const fromCol = fromSquare.charCodeAt(0) - 97;
-    const fromRow = parseInt(fromSquare[1]) - 1;
-    const toCol = toSquare.charCodeAt(0) - 97;
-    const toRow = parseInt(toSquare[1]) - 1;
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 8 8');
-    svg.setAttribute('preserveAspectRatio', 'none');
-    svg.setAttribute('aria-label', `Suggested move: ${fromSquare}–${toSquare}`);
-    const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    arrow.setAttribute('class', 'fromto-arrow');
-    arrow.setAttribute('d', `M ${fromCol}.5 ${3.5} L ${toCol}.5 ${3.5} M ${toCol}.5 ${3.5} L ${toCol - 0.2} ${3.5 - 0.3} M ${toCol}.5 ${3.5} L ${toCol - 0.2} ${3.5 + 0.3}`);
-    const fromCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    fromCircle.setAttribute('class', 'fromto-circle fromto-circle--from');
-    fromCircle.setAttribute('cx', `${fromCol}.5`);
-    fromCircle.setAttribute('cy', `${3.5}`);
-    fromCircle.setAttribute('r', '0.35');
-    const toCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    toCircle.setAttribute('class', 'fromto-circle fromto-circle--to');
-    toCircle.setAttribute('cx', `${toCol}.5`);
-    toCircle.setAttribute('cy', `${3.5}`);
-    toCircle.setAttribute('r', '0.35');
-    svg.append(arrow, fromCircle, toCircle);
-    dom.hintFromTo.replaceChildren(svg, document.createTextNode(`${fromSquare}–${toSquare}`));
+  // ─── Move Lockup (§8.2 — piece glyph + from → to) ─────────────────
+  const MOVE_FROMTO_PATTERN = /^(White|Black):\s*[^:]+:\s*([a-h][1-8])\s*→\s*([a-h][1-8])\s*$/;
+
+  function parseMoveLockup(fromToHint) {
+    if (typeof fromToHint !== 'string') return null;
+    const match = fromToHint.match(MOVE_FROMTO_PATTERN);
+    if (!match) return null;
+    return { side: match[1].toLowerCase(), from: match[2], to: match[3] };
   }
 
-  // ─── Hero Attack Tag ───────────────────────────────────────────────
+  function renderMoveLockup(lockup, fen) {
+    if (!dom.hintFromTo || !lockup) return;
+    const pieceChar = pieceAtSquare(fen, lockup.from);
+    const glyph = pieceChar ? (PIECE_GLYPHS[pieceChar.toLowerCase()] || '♟') : '♟';
+    const isWhitePiece = pieceChar ? pieceChar === pieceChar.toUpperCase() : lockup.side === 'white';
+    dom.hintFromTo.replaceChildren();
+    const piece = document.createElement('span');
+    piece.className = `sq-piece ${isWhitePiece ? 'is-white' : 'is-black'}`;
+    piece.setAttribute('aria-hidden', 'true');
+    piece.textContent = glyph;
+    const fromSq = document.createElement('span');
+    fromSq.className = 'sq';
+    fromSq.textContent = lockup.from;
+    const arrow = document.createElement('span');
+    arrow.className = 'sq-arrow';
+    arrow.setAttribute('aria-hidden', 'true');
+    arrow.textContent = '→';
+    const toSq = document.createElement('span');
+    toSq.className = 'sq';
+    toSq.textContent = lockup.to;
+    dom.hintFromTo.append(piece, fromSq, arrow, toSq);
+    dom.hintFromTo.setAttribute('aria-label', `Move ${lockup.from} to ${lockup.to}`);
+  }
+
+  // ─── Hero Attack Tag + mode washes (§8.2 visual states) ───────────
   function setHeroAttackTag(uci, fen) {
-    if (!dom.hintAttackTag || !fen) { if (dom.hintAttackTag) dom.hintAttackTag.hidden = true; return; }
-    const color = fen.split(' ')[1] || 'w';
-    const isAttacking = color === 'w';
-    const attackerColor = color === 'w' ? 'white' : 'black';
-    dom.hintAttackTag.textContent = isAttacking ? 'Attacking' : 'Defending';
-    dom.hintAttackTag.hidden = false;
-    if (dom.hintCard) {
-      dom.hintCard.className = dom.hintCard.className.replace(/(^|\s)(super-ultra-mode|human-mode)\b/g, '');
-      dom.hintCard.classList.add(isAttacking ? 'attacking' : 'defending');
+    if (!dom.hintAttackTag) return;
+    if (!uci || !fen) { dom.hintAttackTag.hidden = true; return; }
+    const verdict = window.ChessHintEngine && typeof window.ChessHintEngine.detectAttackTags === 'function'
+      ? window.ChessHintEngine.detectAttackTags(uci, fen)
+      : { isAttack: false, tags: [] };
+    if (!verdict || !verdict.isAttack) {
+      dom.hintAttackTag.hidden = true;
+      return;
     }
+    dom.hintAttackTag.textContent = 'Attack';
+    dom.hintAttackTag.title = verdict.tags.join(' · ');
+    dom.hintAttackTag.hidden = false;
+  }
+
+  function updateHeroWash() {
+    if (!dom.hintCard) return;
+    dom.hintCard.classList.toggle('super-ultra-mode',
+      settings.style === 'super_ultra_aggressive' && !settings.humanLikeMode);
+    dom.hintCard.classList.toggle('human-mode', settings.humanLikeMode === true);
   }
 
   // ─── Move Classification ───────────────────────────────────────────
@@ -1479,42 +1661,36 @@
     isRefreshing = false;
   }
 
-  // ─── Scroll Elevation ─────────────────────────────────────────────
+  // ─── Scroll Elevation (§8.1 — app bar elevates on scroll) ─────────
   function initScrollElevation() {
-    const sheet = document.querySelector('.scroll-elevation');
-    if (!sheet) return;
+    const canvas = document.getElementById('canvas');
+    const app = document.getElementById('app');
+    if (!canvas || !app) return;
     let ticking = false;
     const update = () => {
-      if (!sheet) return;
-      const hasScroll = sheet.scrollHeight > sheet.clientHeight + 1;
-      const atTop = sheet.scrollTop <= 0;
-      sheet.classList.toggle('is-scrolled', hasScroll && !atTop);
+      app.classList.toggle('is-scrolled', canvas.scrollTop > 4);
       ticking = false;
     };
-    const onScroll = () => {
+    canvas.addEventListener('scroll', () => {
       if (!ticking) { ticking = true; requestAnimationFrame(update); }
-    };
-    sheet.addEventListener('scroll', onScroll, { passive: true });
+    }, { passive: true });
     if (typeof ResizeObserver === 'function') {
-      new ResizeObserver(() => update()).observe(sheet);
+      new ResizeObserver(() => update()).observe(canvas);
     }
     update();
   }
 
   // ─── Version Stamp ─────────────────────────────────────────────────
   function stampVersion() {
-    chrome.runtime.getManifest().then((manifest) => {
-      if (!manifest || !manifest.version) return;
-      const el = document.getElementById('extension-version');
-      if (el) el.textContent = `v${manifest.version}`;
-    }).catch(() => {
-      chrome.runtime.sendMessage({ type: 'get_version' }, (response) => {
-        if (response && response.version) {
-          const el = document.getElementById('extension-version');
-          if (el) el.textContent = `v${response.version}`;
-        }
-      });
-    });
+    // chrome.runtime.getManifest() is synchronous — calling .then() on its
+    // result throws and would abort the whole init() sequence.
+    let version = '';
+    try {
+      const manifest = chrome.runtime.getManifest();
+      version = manifest && manifest.version ? manifest.version : '';
+    } catch (e) { /* leave empty */ }
+    const el = document.getElementById('app-version-stamp');
+    if (el && version) el.textContent = `Chess Coach v${version}`;
   }
 
   // ─── Event Binding ─────────────────────────────────────────────────
@@ -1559,72 +1735,32 @@
 
     if (dom.btnClearCaches) {
       dom.btnClearCaches.addEventListener('click', async () => {
-        await chrome.runtime.sendMessage({ type: 'clear_cache' });
-        showToast('Caches cleared', 'success', 2000);
+        try {
+          await chrome.runtime.sendMessage({ type: 'clear_caches' });
+          showToast('Caches cleared', 'success', 2000);
+        } catch (e) {
+          showToast('Could not clear caches', 'error', 3000);
+        }
         runHealthCheck();
       });
     }
 
-    // Player selector buttons
+    // Player selector buttons (radiogroup arrows handled generically)
     $$('.player-btn').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
-        const color = btn.dataset.color;
-        if (color) {
-          assistedPlayerColor = color;
-          updatePlayerSelectorUI();
-          saveSettings();
-          showToast(`Coaching ${color === 'w' ? 'White' : 'Black'}`, 'info', 1500);
-          if (isPlayerTurn) requestAnalysis();
-        }
+        selectPlayerColor(btn.dataset.color);
       });
       btn.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          const color = btn.dataset.color;
-          if (color) {
-            assistedPlayerColor = color;
-            updatePlayerSelectorUI();
-            saveSettings();
-            showToast(`Coaching ${color === 'w' ? 'White' : 'Black'}`, 'info', 1500);
-            if (isPlayerTurn) requestAnalysis();
-          }
+          selectPlayerColor(btn.dataset.color);
         }
       });
     });
 
-    // Style choices
-    $$('[data-style]').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (isMaiaOnlyActive()) return;
-        const style = btn.dataset.style;
-        if (style) {
-          settings.style = normalizeStyle(style);
-          applySettingsToUI();
-          saveSettings();
-          updateStyleDescription();
-          updateEarlyKingHuntUI();
-          const styleNames = { normal: 'Normal', aggressive: 'Aggressive', super_ultra_aggressive: 'Ultra-Aggressive' };
-          showToast(`Style: ${styleNames[settings.style] || 'Normal'}`, 'info', 1500);
-          if (isPlayerTurn && currentFen) requestAnalysis();
-        }
-      });
-    });
-
-    // Human-like mode
-    $$('.human-mode-opt').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (isMaiaOnlyActive()) return;
-        const mode = btn.dataset.mode;
-        settings.humanLikeMode = mode === 'on';
-        applySettingsToUI();
-        saveSettings();
-        showToast(settings.humanLikeMode ? 'Human-like mode ON' : 'Human-like mode OFF', 'info', 1500);
-        if (isPlayerTurn && currentFen) requestAnalysis();
-      });
-    });
+    // Style choices + human-mode segmented are bound generically in
+    // initSegmentedControls() via data-expressive-setting (§9.1/§9.2).
 
     // Sparring strength slider
     const sparringInput = document.getElementById('setting-sparring-strength');
@@ -1698,18 +1834,8 @@
       }
     });
 
-    // Select dropdowns
-    ['setting-analysis-quality', 'setting-candidate-lines'].forEach((id) => {
-      const el = document.getElementById(id);
-      if (el) {
-        el.addEventListener('change', () => {
-          if (id === 'setting-analysis-quality') settings.analysisQuality = el.value;
-          else settings.candidateLines = el.value;
-          saveSettings();
-          if (isPlayerTurn && currentFen) requestAnalysis();
-        });
-      }
-    });
+    // Quality / candidate-line segmented controls are bound generically
+    // via data-expressive-setting (§9.1); no legacy change listeners.
 
     chrome.runtime.onMessage.addListener(handleMessage);
   }
@@ -1727,7 +1853,8 @@
     stampVersion();
     setBalanceEmptyState();
     renderMoveClassificationEmpty();
-    if (dom.evalBar) dom.evalBar.setAttribute('role', 'slider');
+    syncWelcome();          // welcome state: hide eval/verdict/facts until a board appears
+    updateHeroWash();
     startBoardReading();
   }
 
